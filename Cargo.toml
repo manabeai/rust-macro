@@ -1,0 +1,12 @@
+[package]
+name = "rust-macro"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <you@example.com>"]
+description = "A collection of useful macros for competitive programming in Rust"
+license = "MIT"
+repository = "https://github.com/yourusername/rust-macro"
+
+[dependencies]
+
+[dev-dependencies]
