@@ -20,6 +20,13 @@ macro_rules! println {
     }};
 }
 
+#[macro_export]
+macro_rules! printvec {
+    ($vec:expr) => {
+        println!("{}", $vec.iter().join(" "));
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
