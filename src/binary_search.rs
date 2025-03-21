@@ -1,4 +1,4 @@
-fn binary_search<F>(mut ng: isize, mut ok: isize, f: F) -> isize
+pub fn binary_search<F>(mut ng: isize, mut ok: isize, f: F) -> isize
 where
     F: Fn(isize) -> bool,
 {

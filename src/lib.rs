@@ -2,6 +2,6 @@
 
 pub mod union_find;
 pub mod macro_utils;
+pub mod cumulative_sum;
 
-pub use macro_utils::*;
 pub use union_find::UnionFind;
