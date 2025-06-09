@@ -23,7 +23,8 @@ impl<T> CumulativeSum<T>
 where
     T: Add<Output = T> + Sub<Output = T> + Copy + Default,
 {
-    fn new(arr: &[T]) -> Self {
+    /// Creates a new cumulative sum from a slice.
+    pub fn new(arr: &[T]) -> Self {
         let mut data = Vec::with_capacity(arr.len() + 1);
         data.push(T::default());
 
@@ -35,7 +36,8 @@ where
         Self { data }
     }
 
-    fn sum(&self, l: usize, r: usize) -> T {
+    /// Returns the inclusive sum on the range [l, r).
+    pub fn sum(&self, l: usize, r: usize) -> T {
         assert!(l <= r && r < self.data.len());
         self.data[r] - self.data[l]
     }

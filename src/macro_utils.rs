@@ -22,9 +22,14 @@ macro_rules! println {
 
 #[macro_export]
 macro_rules! printvec {
-    ($vec:expr) => {
-        println!("{}", $vec.iter().join(" "));
-    };
+    ($vec:expr) => {{
+        let joined = $vec
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        println!("{}", joined);
+    }};
 }
 
 #[cfg(test)]
