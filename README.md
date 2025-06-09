@@ -38,10 +38,10 @@ use rust_macro::UnionFind;
 
 fn main() {
     let mut uf = UnionFind::new(5);
-    
+
     uf.unite(0, 1);
     uf.unite(2, 3);
-    
+
     println!("Same set:", uf.same(0, 1));  // true
     println!("Set size:", uf.size(0));     // 2
 }
