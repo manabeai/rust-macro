@@ -6,3 +6,4 @@ pub mod cumulative_sum;
 pub mod utils;
 
 pub use union_find::UnionFind;
+pub use cumulative_sum::CumulativeSum;
