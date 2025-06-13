@@ -10,6 +10,8 @@ A collection of useful macros and data structures for competitive programming in
 
 - **Data Structures**
   - `UnionFind`: Efficient Union-Find/Disjoint Set Union data structure
+  - `CumulativeSum`: 1D prefix sums for range queries
+  - `CumulativeSum2D`: 2D prefix sums for rectangular queries
 
 ## Usage
 
@@ -44,6 +46,21 @@ fn main() {
     
     println!("Same set:", uf.same(0, 1));  // true
     println!("Set size:", uf.size(0));     // 2
+}
+```
+
+### 2D Cumulative Sum
+
+```rust
+use rust_macro::CumulativeSum2D;
+
+fn main() {
+    let matrix = vec![
+        vec![1, 2],
+        vec![3, 4],
+    ];
+    let cs = CumulativeSum2D::new(&matrix);
+    println!("{}", cs.sum(0, 0, 2, 2)); // 10
 }
 ```
 
