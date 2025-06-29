@@ -30,11 +30,11 @@ impl UnionFind {
     pub fn unite(&mut self, x: usize, y: usize) {
         let x_root = self.find(x);
         let y_root = self.find(y);
-        
+
         if x_root == y_root {
             return;
         }
-        
+
         // Union by size
         if self.size[x_root] < self.size[y_root] {
             self.parent[x_root] = y_root;
@@ -64,22 +64,22 @@ mod tests {
     #[test]
     fn test_union_find() {
         let mut uf = UnionFind::new(5);
-        
+
         // Initial state
         assert!(uf.same(0, 0));
         assert!(!uf.same(0, 1));
-        
+
         // Union operations
         uf.unite(0, 1);
         assert!(uf.same(0, 1));
-        
+
         uf.unite(2, 3);
         assert!(uf.same(2, 3));
         assert!(!uf.same(1, 2));
-        
+
         uf.unite(1, 2);
         assert!(uf.same(0, 3));
-        
+
         // Check size
         assert_eq!(uf.size(0), 4);
     }

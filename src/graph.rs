@@ -1,6 +1,8 @@
-use std::collections::{ HashMap, HashSet };
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
-use std::cmp::min;
+// use std::cmp::{ min, max };
+use std::cmp::{max, min};
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 struct Edge<I, EW> {
@@ -14,13 +16,15 @@ struct Node<I, NW> {
     weight: Option<NW>,
 }
 #[derive(Debug, Clone)]
-struct Graph<I, EW, NW> {
+struct Graph<I: std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::Debug> {
     n: usize,
     nodes: HashMap<I, Node<I, NW>>,
     adj: HashMap<I, HashMap<I, Edge<I, EW>>>,
 }
 
-impl<I: Clone + Eq + Hash, EW, NW> Graph<I, EW, NW> {
+impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::Debug>
+    Graph<I, EW, NW>
+{
     fn new(n: usize) -> Self {
         Graph {
             n,
@@ -30,7 +34,10 @@ impl<I: Clone + Eq + Hash, EW, NW> Graph<I, EW, NW> {
     }
 
     fn add_edge(&mut self, from: I, to: I, weight: Option<EW>) {
-        self.adj.entry(from.clone()).or_default().insert(to.clone(), Edge { to, weight });
+        self.adj
+            .entry(from.clone())
+            .or_default()
+            .insert(to.clone(), Edge { to, weight });
     }
 
     fn add_weight_to_node(&mut self, id: I, weight: NW) {
@@ -40,74 +47,64 @@ impl<I: Clone + Eq + Hash, EW, NW> Graph<I, EW, NW> {
         });
     }
 
-    fn dfs<V, F1, F2, F3>(&self, start: I, goal_check: F3, merge: F1, add_node: F2) -> Option<V>
-        where
-            V: Copy,
-            F1: Fn(Option<V>, Option<V>) -> Option<V>,
-            F2: Fn(Option<V>, &Edge<I, EW>) -> Option<V>,
-            F3: Fn(&I) -> bool,
-            I: Clone + Eq + Hash,
-            EW: Copy,
-            NW: Copy
+    fn dfs<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> V
+    where
+        V: Copy + Default + std::fmt::Debug,
+        F1: Fn(V, V) -> V,
+        F2: Fn(V, &Node<I, NW>, &Edge<I, EW>) -> V,
+        I: Clone + Eq + Hash,
+        EW: Copy,
+        NW: Copy,
     {
         let mut visited = HashSet::new();
-        let mut res: Option<V> = None;
+        let mut res = V::default();
 
-        fn dfs_inner<I, EW, NW, V, F1, F2, F3>(
+        fn dfs_inner<I, EW, NW, V, F1, F2>(
             graph: &Graph<I, EW, NW>,
             current: I,
-            goal_check: &F3,
             visited: &mut HashSet<I>,
-            acc: Option<V>,
-            res: &mut Option<V>,
+            res: &V,
             merge: &F1,
-            add_node: &F2
-        )
-            where
-                V: Copy,
-                F1: Fn(Option<V>, Option<V>) -> Option<V>,
-                F2: Fn(Option<V>, &Edge<I, EW>) -> Option<V>,
-                F3: Fn(&I) -> bool,
-                I: Clone + Eq + Hash,
-                EW: Copy,
-                NW: Copy
+            add_node: &F2,
+        ) -> V
+        where
+            V: Copy + Default + std::fmt::Debug,
+            F1: Fn(V, V) -> V,
+            F2: Fn(V, &Node<I, NW>, &Edge<I, EW>) -> V,
+            I: Clone + Eq + Hash + std::fmt::Debug,
+            EW: Copy + std::fmt::Debug,
+            NW: Copy + std::fmt::Debug,
         {
-            if goal_check(&current) {
-                if let Some(r) = res {
-                    *res = merge(Some(*r), acc);
-                } else {
-                    *res = acc;
-                }
-                return;
-            }
-
             visited.insert(current.clone());
+            let mut new_res = res.clone();
 
+            // nodeを明示的に持っていないときのtmp用のfallback
+            let fallback_node = Node {
+                id: current.clone(),
+                weight: None,
+            };
+            let node = graph.nodes.get(&current).unwrap_or(&fallback_node);
             if let Some(neighbors) = graph.adj.get(&current) {
+                // println!("Visiting node: {:?}", node);
+                // println!("Neighbors: {:?}", neighbors);
                 for (next, edge) in neighbors {
                     if visited.contains(next) {
                         continue;
                     }
-                    let new_acc = add_node(acc, edge);
-                    dfs_inner(
-                        graph,
-                        next.clone(),
-                        goal_check,
-                        visited,
-                        new_acc,
-                        res,
-                        merge,
-                        add_node
-                    );
+                    let sub_result = dfs_inner(graph, next.clone(), visited, res, merge, add_node);
+                    // println!("Edge from {:?} to {:?} with weight: {:?}", node, next, edge.weight);
+
+                    // println!("Sub-result: {:?}", sub_result);
+                    new_res = merge(new_res, add_node(sub_result, node, edge));
+                    // println!("New result after merge: {:?}", new_res);
                 }
             }
-
-            visited.remove(&current);
+            new_res
         }
+        // let mut result = V::default();
+        let new_res = dfs_inner(self, start, &mut visited, &res, &merge, &add_node);
 
-        dfs_inner(self, start, &goal_check, &mut visited, None, &mut res, &merge, &add_node);
-
-        res
+        new_res
     }
 }
 
@@ -117,227 +114,79 @@ mod tests {
 
     #[test]
     fn test_simple_path() {
-        let mut graph = Graph::<usize, usize, ()>::new(3);
+        let mut graph = Graph::<usize, usize, usize>::new(4);
         graph.add_edge(1, 2, Some(5));
-        graph.add_edge(2, 3, Some(2));
-        graph.add_edge(1, 3, Some(10));
+        graph.add_edge(2, 1, Some(5));
+        graph.add_edge(2, 3, Some(10));
+        graph.add_edge(3, 2, Some(10));
+        graph.add_edge(1, 4, Some(16));
+        graph.add_edge(4, 1, Some(31));
 
-        let merge: fn(Option<usize>, Option<usize>) -> Option<usize> = |a, b| {
-            match (a, b) {
-                (Some(x), Some(y)) => Some(min(x, y)),
-                (Some(x), None) => Some(x),
-                (None, Some(y)) => Some(y),
-                (None, None) => None,
-            }
-        };
-        let add_node: fn(Option<usize>, &Edge<usize, usize>) -> Option<usize> = |a, b| {
-            match (a, b.weight) {
-                (Some(acc), Some(w)) => Some(acc + w),
-                (None, Some(w)) => Some(w),
-                _ => None,
-            }
-        };
-        let ans = graph.dfs(1, |x| *x == 3, merge, add_node);
-        assert_eq!(ans, Some(7));
+        let merge = |a, b| a + b;
+        let add_node =
+            |a: usize, b: &Node<usize, usize>, edge: &Edge<usize, usize>| a + edge.weight.unwrap();
+        let ans = graph.dfs(1, merge, add_node);
+        assert_eq!(ans, 31); // 1 -> 2 -> 3 の経路で最小の重みは 5
     }
 
     #[test]
     fn test_simple_reachability() {
-        let mut graph = Graph::<usize, (), ()>::new(5);
-        graph.add_edge(1, 2, None);
-        graph.add_edge(2, 3, None);
-        graph.add_edge(3, 4, None);
-        graph.add_edge(1, 5, None);
+        let mut graph = Graph::<usize, usize, usize>::new(5);
+        graph.add_edge(1, 2, Some(5));
+        graph.add_edge(2, 1, Some(5));
+        graph.add_edge(2, 3, Some(10));
+        graph.add_edge(3, 2, Some(10));
+        graph.add_edge(1, 4, Some(16));
+        graph.add_edge(4, 1, Some(31));
+        // let merge: fn(Option<bool>, Option<bool>) -> Option<bool> = |a, b| {
+        //     match (a, b) {
+        //         (Some(true), _) | (_, Some(true)) => Some(true),
+        //         _ => None,
+        //     }
+        // };
+        // let add_node: fn(Option<bool>, &Edge<usize, usize>) -> Option<bool> = |_, _| Some(true);
+        let merge = |a, b| (a || b);
 
-        let merge: fn(Option<bool>, Option<bool>) -> Option<bool> = |a, b| {
-            match (a, b) {
-                (Some(true), _) | (_, Some(true)) => Some(true),
-                _ => None,
-            }
-        };
-        let add_node: fn(Option<bool>, &Edge<usize, ()>) -> Option<bool> = |_, _| Some(true);
+        // 1から2への到達可能性
+        let goal = 2;
+        let add_node =
+            |res, _node: &Node<usize, usize>, edge: &Edge<usize, usize>| res || edge.to == goal;
+        assert_eq!(graph.dfs(1, merge, add_node), true);
 
-        assert_eq!(
-            graph.dfs(1, |x| *x == 4, merge, add_node),
-            Some(true)
-        );
-        assert_eq!(
-            graph.dfs(1, |x| *x == 5, merge, add_node),
-            Some(true)
-        );
-        assert_eq!(
-            graph.dfs(2, |x| *x == 4, merge, add_node),
-            Some(true)
-        );
-        assert_eq!(
-            graph.dfs(2, |x| *x == 1, merge, add_node),
-            None
-        );
-        assert_eq!(
-            graph.dfs(4, |x| *x == 1, merge, add_node),
-            None
-        );
+        let add_node =
+            |res, _node: &Node<usize, usize>, edge: &Edge<usize, usize>| res || edge.to == 5;
+        // 1から5への到達可能性
+        assert_eq!(graph.dfs(1, merge, add_node), false);
     }
 
+    // 接続している頂点の中で重みの最小値と最大値のタプル
     #[test]
-    fn test_disconnected_nodes() {
-        let mut graph = Graph::<usize, (), ()>::new(6);
-        // 接続された部分: 1-2-3
-        graph.add_edge(1, 2, None);
-        graph.add_edge(2, 3, None);
-        // 接続された部分: 4-5
-        graph.add_edge(4, 5, None);
-        // 6は完全に孤立
-
-        let merge: fn(Option<bool>, Option<bool>) -> Option<bool> = |a, b| {
-            match (a, b) {
-                (Some(true), _) | (_, Some(true)) => Some(true),
-                _ => None,
-            }
-        };
-        let add_node: fn(Option<bool>, &Edge<usize, ()>) -> Option<bool> = |_, _| Some(true);
-
-        // 1から3への到達可能性
-        assert_eq!(
-            graph.dfs(1, |x| *x == 3, merge, add_node),
-            Some(true)
-        );
-
-        // 1から4への到達不可能性（異なる連結成分）
-        assert_eq!(
-            graph.dfs(1, |x| *x == 4, merge, add_node),
-            None
-        );
-
-        // 1から6への到達不可能性（6は孤立）
-        assert_eq!(
-            graph.dfs(1, |x| *x == 6, merge, add_node),
-            None
-        );
-
-        // 4から5への到達可能性
-        assert_eq!(
-            graph.dfs(4, |x| *x == 5, merge, add_node),
-            Some(true)
-        );
-
-        // 4から1への到達不可能性（異なる連結成分）
-        assert_eq!(
-            graph.dfs(4, |x| *x == 1, merge, add_node),
-            None
-        );
-
-        // 6からどこへも到達不可能（孤立ノード）
-        assert_eq!(
-            graph.dfs(6, |x| *x == 1, merge, add_node),
-            None
-        );
-        assert_eq!(
-            graph.dfs(6, |x| *x == 4, merge, add_node),
-            None
-        );
-    }
-
-    #[test]
-    fn test_sum_all_connected_edges() {
-        let mut graph = Graph::<usize, usize, ()>::new(5);
-        graph.add_edge(1, 2, Some(10));
-        graph.add_edge(2, 3, Some(20));
-        graph.add_edge(1, 3, Some(15));
-        graph.add_edge(2, 4, Some(25));
-        // 5は孤立
-
-        let merge: fn(Option<usize>, Option<usize>) -> Option<usize> = |a, b| {
-            match (a, b) {
-                (Some(x), Some(y)) => Some(x + y),
-                (Some(x), None) => Some(x),
-                (None, Some(y)) => Some(y),
-                (None, None) => None,
-            }
-        };
-
-        let add_node: fn(Option<usize>, &Edge<usize, usize>) -> Option<usize> = |acc, edge| {
-            match (acc, edge.weight) {
-                (Some(sum), Some(weight)) => Some(sum + weight),
-                (None, Some(weight)) => Some(weight),
-                _ => acc,
-            }
-        };
-
-        // 現在の実装では |_| false は結果がNoneになる
-        let result = graph.dfs(1, |_| false, merge, add_node);
-        assert_eq!(result, None);
-
-        // 特定のゴールへの経路の重みを計算
-        let result_to_4 = graph.dfs(1, |x| *x == 4, merge, add_node);
-        assert_eq!(result_to_4, Some(35)); // 1->2->4: 10 + 25 = 35
-
-        // 5からは辞がないのでNone
-        let result_isolated = graph.dfs(5, |_| false, merge, add_node);
-        assert_eq!(result_isolated, None);
-    }
-
-    #[test]
-    fn test_node_and_edge_weights() {
+    fn test_min_max_weights() {
         let mut graph = Graph::<usize, usize, usize>::new(4);
-        // 辺の重み
-        graph.add_edge(1, 2, Some(10));
-        graph.add_edge(2, 3, Some(20));
+        graph.add_edge(1, 2, Some(5));
+        graph.add_edge(2, 3, Some(10));
         graph.add_edge(1, 3, Some(15));
-        // 頂点の重み
-        graph.add_weight_to_node(1, 5);
-        graph.add_weight_to_node(2, 8);
-        graph.add_weight_to_node(3, 12);
+        graph.add_edge(2, 4, Some(20));
 
-        let merge: fn(Option<usize>, Option<usize>) -> Option<usize> = |a, b| {
-            match (a, b) {
-                (Some(x), Some(y)) => Some(x + y),
-                (Some(x), None) => Some(x),
-                (None, Some(y)) => Some(y),
-                (None, None) => None,
+        type V = Option<(usize, usize)>;
+
+        let merge = |a: V, b: V| match (a, b) {
+            (Some((amin, amax)), Some((bmin, bmax))) => Some((min(amin, bmin), max(amax, bmax))),
+            (Some(pair), None) | (None, Some(pair)) => Some(pair),
+            _ => None,
+        };
+        let add_node = |res, _node: &Node<usize, usize>, edge: &Edge<usize, usize>| {
+            let weight = edge.weight.unwrap_or(0);
+            match res {
+                Some((min_weight, max_weight)) => {
+                    Some((min(min_weight, weight), max(max_weight, weight)))
+                }
+                None => Some((weight, weight)),
             }
         };
-
-        // グラフへの参照をクロージャで使用するため、別の関数として定義
-        let get_node_weight = |node_id: &usize| -> usize {
-            graph.nodes
-                .get(node_id)
-                .and_then(|node| node.weight)
-                .unwrap_or(0)
-        };
-
-        let add_node_with_vertex = |
-            acc: Option<usize>,
-            edge: &Edge<usize, usize>
-        | -> Option<usize> {
-            // 辺の重みと到達ノードの重みを両方加算
-            let edge_weight = edge.weight.unwrap_or(0);
-            let node_weight = get_node_weight(&edge.to);
-            match acc {
-                Some(sum) => Some(sum + edge_weight + node_weight),
-                None => Some(edge_weight + node_weight),
-            }
-        };
-
-        // 辺の重みのみを考慮
-        let add_edge_only: fn(Option<usize>, &Edge<usize, usize>) -> Option<usize> = |acc, edge| {
-            match (acc, edge.weight) {
-                (Some(sum), Some(weight)) => Some(sum + weight),
-                (None, Some(weight)) => Some(weight),
-                _ => acc,
-            }
-        };
-
-        // 辺の重みのみ: 1->3への全経路の合計
-        // 経路1: 1->3 (15), 経路2: 1->2->3 (10+20=30) → 合計45
-        let result_edge_only = graph.dfs(1, |x| *x == 3, merge, add_edge_only);
-        assert_eq!(result_edge_only, Some(45));
-
-        // 辺と頂点の重み両方を考慮した場合
-        // 経路1: 1->3 (辺15 + ノード3の12 = 27)
-        // 経路2: 1->2->3 (辺10 + ノード2の8 + 辺20 + ノード3の12 = 50)
-        // 合計: 27 + 50 = 77
-        let result_with_nodes = graph.dfs(1, |x| *x == 3, merge, add_node_with_vertex);
-        assert_eq!(result_with_nodes, Some(77));
+        let result = graph.dfs(1, merge, add_node);
+        let (min_weight, max_weight) = result.unwrap();
+        assert_eq!(min_weight, 5);
+        assert_eq!(max_weight, 20);
     }
 }

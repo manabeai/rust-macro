@@ -8,8 +8,8 @@
     dead_code
 )]
 
-use std::{cmp::max, cmp::min, collections::HashMap, collections::HashSet, io::*};
 use std::ops::{Add, Sub};
+use std::{cmp::max, cmp::min, collections::HashMap, collections::HashSet, io::*};
 
 #[derive(Debug, Clone)]
 pub struct CumulativeSum<T>
