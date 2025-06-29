@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
-// use std::cmp::{ min, max };
 use std::cmp::{max, min};
 use std::fmt::Debug;
 
@@ -108,8 +107,51 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
     }
 }
 
+fn gen_grid_graph<V, F>(
+    input: Vec<Vec<V>>,
+    is_connectable: F,
+) -> Graph<(usize, usize), usize, V>
+where
+    V: Clone + Debug,
+    F: Fn(&V) -> bool,
+    V: Debug,
+{
+    let h = input.len();
+    let w = input[0].len();
+    let mut graph = Graph::new(h * w);
+
+    for i in 0..h {
+        for j in 0..w {
+            if is_connectable(&input[i][j]) {
+                graph.add_weight_to_node((i, j), input[i][j].clone());
+
+                // 上
+                if i > 0 && is_connectable(&input[i - 1][j]) {
+                    graph.add_edge((i, j), (i - 1, j), Some(1));
+                }
+                // 下
+                if i + 1 < h && is_connectable(&input[i + 1][j]) {
+                    graph.add_edge((i, j), (i + 1, j), Some(1));
+                }
+                // 左
+                if j > 0 && is_connectable(&input[i][j - 1]) {
+                    graph.add_edge((i, j), (i, j - 1), Some(1));
+                }
+                // 右
+                if j + 1 < w && is_connectable(&input[i][j + 1]) {
+                    graph.add_edge((i, j), (i, j + 1), Some(1));
+                }
+            }
+        }
+    }
+    graph
+}
+
+
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
 
     #[test]
@@ -124,9 +166,9 @@ mod tests {
 
         let merge = |a, b| a + b;
         let add_node =
-            |a: usize, b: &Node<usize, usize>, edge: &Edge<usize, usize>| a + edge.weight.unwrap();
+            |a: usize, _: &Node<usize, usize>, edge: &Edge<usize, usize>| a + edge.weight.unwrap();
         let ans = graph.dfs(1, merge, add_node);
-        assert_eq!(ans, 31); // 1 -> 2 -> 3 の経路で最小の重みは 5
+        assert_eq!(ans, 31);
     }
 
     #[test]
@@ -188,5 +230,32 @@ mod tests {
         let (min_weight, max_weight) = result.unwrap();
         assert_eq!(min_weight, 5);
         assert_eq!(max_weight, 20);
+    }
+
+    // グリッドグラフで連結か判定
+    #[test]
+    fn test_grid_graph_connected() {
+
+        let g = vec![
+            vec![1, 0, 0],
+            vec![1, 1, 0],
+            vec![0, 1, 1],
+        ];
+
+        let graph = gen_grid_graph(g, |&x| x == 1);
+
+        let merge = |a: bool, b: bool| a || b;
+        let add_node = |res: bool, _node: &Node<(usize, usize), usize>, edge: &Edge<(usize, usize), usize>| {
+            res || edge.to == (2, 2)
+        };
+        let start = (0, 0);
+        let result = graph.dfs(start, merge, add_node);
+        assert_eq!(result, true, "The grid graph should be connected to (2, 2) from (0, 0)");
+
+        let add_node2 = |res: bool, _node: &Node<(usize, usize), usize>, edge: &Edge<(usize, usize), usize>| {
+            res || edge.to == (0, 2)
+        };
+        let result2 = graph.dfs(start, merge, add_node2);
+        assert_eq!(result2, false, "The grid graph should not be connected to (0, 2) from (0, 0)");
     }
 }
