@@ -3,6 +3,7 @@ use std::hash::Hash;
 use std::cmp::{max, min};
 use std::fmt::Debug;
 
+
 #[derive(Debug, Clone)]
 struct Edge<I, EW> {
     to: I,
@@ -60,6 +61,7 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
 
         fn dfs_inner<I, EW, NW, V, F1, F2>(
             graph: &Graph<I, EW, NW>,
+            prev: Option<&Edge<I, EW>>,
             current: I,
             visited: &mut HashSet<I>,
             res: &V,
@@ -90,22 +92,34 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
                     if visited.contains(next) {
                         continue;
                     }
-                    let sub_result = dfs_inner(graph, next.clone(), visited, res, merge, add_node);
+                    let sub_result = dfs_inner(
+                        graph,
+                        Some(&edge),
+                        next.clone(),
+                        visited,
+                        res,
+                        merge,
+                        add_node,
+                    );
                     // println!("Edge from {:?} to {:?} with weight: {:?}", node, next, edge.weight);
 
                     // println!("Sub-result: {:?}", sub_result);
-                    new_res = merge(new_res, add_node(sub_result, node, edge));
+                    new_res = merge(new_res, sub_result);
                     // println!("New result after merge: {:?}", new_res);
                 }
             }
-            new_res
+            match prev {
+                Some(edge) => add_node(new_res, node, edge),
+                None => new_res,
+            }
         }
         // let mut result = V::default();
-        let new_res = dfs_inner(self, start, &mut visited, &res, &merge, &add_node);
+        let new_res = dfs_inner(self, None, start, &mut visited, &res, &merge, &add_node);
 
         new_res
     }
 }
+
 
 fn gen_grid_graph<V, F>(
     input: Vec<Vec<V>>,
@@ -156,19 +170,23 @@ mod tests {
 
     #[test]
     fn test_simple_path() {
-        let mut graph = Graph::<usize, usize, usize>::new(4);
+        let mut graph = Graph::<usize, usize, usize>::new(6);
         graph.add_edge(1, 2, Some(5));
         graph.add_edge(2, 1, Some(5));
         graph.add_edge(2, 3, Some(10));
         graph.add_edge(3, 2, Some(10));
         graph.add_edge(1, 4, Some(16));
-        graph.add_edge(4, 1, Some(31));
+        graph.add_edge(4, 1, Some(16));
+        graph.add_edge(5, 6, Some(34));
+        graph.add_edge(6, 5, Some(34));
+
 
         let merge = |a, b| a + b;
         let add_node =
             |a: usize, _: &Node<usize, usize>, edge: &Edge<usize, usize>| a + edge.weight.unwrap();
         let ans = graph.dfs(1, merge, add_node);
         assert_eq!(ans, 31);
+        assert_eq!(graph.dfs(6, merge, add_node), 34, "The total weight from node 6 should be 34");
     }
 
     #[test]
