@@ -108,10 +108,7 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
                     // println!("New result after merge: {:?}", new_res);
                 }
             }
-            match prev {
-                Some(edge) => add_node(new_res, node, edge),
-                None => new_res,
-            }
+            prev.map_or(new_res, |edge| add_node(new_res, node, edge))
         }
         // let mut result = V::default();
         let new_res = dfs_inner(self, None, start, &mut visited, &res, &merge, &add_node);
