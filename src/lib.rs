@@ -8,3 +8,5 @@ pub mod union_find;
 pub mod utils;
 
 pub use union_find::UnionFind;
+pub use utils::yesno;
+pub use utils::Compress;
