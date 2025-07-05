@@ -1,31 +1,30 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
-use std::cmp::{max, min};
 use std::fmt::Debug;
 
 
 #[derive(Debug, Clone)]
-struct Edge<I, EW> {
-    to: I,
-    weight: Option<EW>,
+pub struct Edge<I, EW> {
+    pub to: I,
+    pub weight: Option<EW>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct Node<I, NW> {
-    id: I,
-    weight: Option<NW>,
+pub struct Node<I, NW> {
+    pub id: I,
+    pub weight: Option<NW>,
 }
 #[derive(Debug, Clone)]
-struct Graph<I: std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::Debug> {
-    n: usize,
-    nodes: HashMap<I, Node<I, NW>>,
-    adj: HashMap<I, HashMap<I, Edge<I, EW>>>,
+pub struct Graph<I: std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::Debug> {
+    pub n: usize,
+    pub nodes: HashMap<I, Node<I, NW>>,
+    pub adj: HashMap<I, HashMap<I, Edge<I, EW>>>,
 }
 
 impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::Debug>
     Graph<I, EW, NW>
 {
-    fn new(n: usize) -> Self {
+    pub fn new(n: usize) -> Self {
         Graph {
             n,
             nodes: HashMap::new(),
@@ -33,21 +32,21 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
         }
     }
 
-    fn add_edge(&mut self, from: I, to: I, weight: Option<EW>) {
+    pub fn add_edge(&mut self, from: I, to: I, weight: Option<EW>) {
         self.adj
             .entry(from.clone())
             .or_default()
             .insert(to.clone(), Edge { to, weight });
     }
 
-    fn add_weight_to_node(&mut self, id: I, weight: NW) {
+    pub fn add_weight_to_node(&mut self, id: I, weight: NW) {
         self.nodes.entry(id.clone()).or_insert(Node {
             id,
             weight: Some(weight),
         });
     }
 
-    fn dfs<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> V
+    pub fn dfs<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> V
     where
         V: Copy + Default + std::fmt::Debug,
         F1: Fn(V, V) -> V,
@@ -57,7 +56,7 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
         NW: Copy,
     {
         let mut visited = HashSet::new();
-        let mut res = V::default();
+        let res = V::default();
 
         fn dfs_inner<I, EW, NW, V, F1, F2>(
             graph: &Graph<I, EW, NW>,
@@ -118,6 +117,7 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
 }
 
 
+#[allow(dead_code)]
 fn gen_grid_graph<V, F>(
     input: Vec<Vec<V>>,
     is_connectable: F,
@@ -219,6 +219,7 @@ mod tests {
     // 接続している頂点の中で重みの最小値と最大値のタプル
     #[test]
     fn test_min_max_weights() {
+        use std::cmp::{max, min};
         let mut graph = Graph::<usize, usize, usize>::new(4);
         graph.add_edge(1, 2, Some(5));
         graph.add_edge(2, 3, Some(10));
@@ -246,7 +247,6 @@ mod tests {
         assert_eq!(min_weight, 5);
         assert_eq!(max_weight, 20);
     }
-
     // グリッドグラフで連結か判定
     #[test]
     fn test_grid_graph_connected() {
