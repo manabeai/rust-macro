@@ -6,7 +6,9 @@ pub struct Imos1D {
 impl Imos1D {
     /// 長さnのimos配列を作成
     pub fn new(n: usize) -> Self {
-        Imos1D { data: vec![0; n + 1] }
+        Imos1D {
+            data: vec![0; n + 1],
+        }
     }
 
     /// 区間[l, r)にxを加算
@@ -39,15 +41,27 @@ pub struct Imos2D {
 impl Imos2D {
     /// 高さh, 幅wのimos配列を作成
     pub fn new(h: usize, w: usize) -> Self {
-        Imos2D { data: vec![vec![0; w + 1]; h + 1], h, w }
+        Imos2D {
+            data: vec![vec![0; w + 1]; h + 1],
+            h,
+            w,
+        }
     }
 
     /// 左上(x1, y1), 右下(x2, y2)の長方形にxを加算 (x2, y2は含まない)
     pub fn add(&mut self, x1: usize, y1: usize, x2: usize, y2: usize, x: i64) {
-        if x1 < self.h + 1 && y1 < self.w + 1 { self.data[x1][y1] += x; }
-        if x2 < self.h + 1 && y1 < self.w + 1 { self.data[x2][y1] -= x; }
-        if x1 < self.h + 1 && y2 < self.w + 1 { self.data[x1][y2] -= x; }
-        if x2 < self.h + 1 && y2 < self.w + 1 { self.data[x2][y2] += x; }
+        if x1 < self.h + 1 && y1 < self.w + 1 {
+            self.data[x1][y1] += x;
+        }
+        if x2 < self.h + 1 && y1 < self.w + 1 {
+            self.data[x2][y1] -= x;
+        }
+        if x1 < self.h + 1 && y2 < self.w + 1 {
+            self.data[x1][y2] -= x;
+        }
+        if x2 < self.h + 1 && y2 < self.w + 1 {
+            self.data[x2][y2] += x;
+        }
     }
 
     /// 累積和を計算し、h×wの配列を返す
@@ -62,7 +76,11 @@ impl Imos2D {
                 self.data[i][j] += self.data[i - 1][j];
             }
         }
-        self.data.iter().take(self.h).map(|row| row[..self.w].to_vec()).collect()
+        self.data
+            .iter()
+            .take(self.h)
+            .map(|row| row[..self.w].to_vec())
+            .collect()
     }
 }
 
@@ -85,11 +103,6 @@ mod tests {
         imos.add(0, 0, 2, 2, 1);
         imos.add(1, 1, 3, 3, 2);
         let res = imos.build();
-        assert_eq!(res, vec![
-            vec![1, 1, 0],
-            vec![1, 3, 2],
-            vec![0, 2, 2],
-        ]);
+        assert_eq!(res, vec![vec![1, 1, 0], vec![1, 3, 2], vec![0, 2, 2],]);
     }
 }
-

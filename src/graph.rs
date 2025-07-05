@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 use std::fmt::Debug;
-
+use std::hash::Hash;
 
 #[derive(Debug, Clone)]
 pub struct Edge<I, EW> {
@@ -76,7 +75,7 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
             NW: Copy + std::fmt::Debug,
         {
             visited.insert(current.clone());
-            let mut new_res = res.clone();
+            let mut new_res = *res;
 
             // nodeを明示的に持っていないときのtmp用のfallback
             let fallback_node = Node {
@@ -93,7 +92,7 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
                     }
                     let sub_result = dfs_inner(
                         graph,
-                        Some(&edge),
+                        Some(edge),
                         next.clone(),
                         visited,
                         res,
@@ -110,18 +109,12 @@ impl<I: Clone + Eq + Hash + std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::
             prev.map_or(new_res, |edge| add_node(new_res, node, edge))
         }
         // let mut result = V::default();
-        let new_res = dfs_inner(self, None, start, &mut visited, &res, &merge, &add_node);
-
-        new_res
+        dfs_inner(self, None, start, &mut visited, &res, &merge, &add_node)
     }
 }
 
-
 #[allow(dead_code)]
-fn gen_grid_graph<V, F>(
-    input: Vec<Vec<V>>,
-    is_connectable: F,
-) -> Graph<(usize, usize), usize, V>
+fn gen_grid_graph<V, F>(input: Vec<Vec<V>>, is_connectable: F) -> Graph<(usize, usize), usize, V>
 where
     V: Clone + Debug,
     F: Fn(&V) -> bool,
@@ -158,7 +151,6 @@ where
     graph
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::vec;
@@ -177,13 +169,16 @@ mod tests {
         graph.add_edge(5, 6, Some(34));
         graph.add_edge(6, 5, Some(34));
 
-
         let merge = |a, b| a + b;
         let add_node =
             |a: usize, _: &Node<usize, usize>, edge: &Edge<usize, usize>| a + edge.weight.unwrap();
         let ans = graph.dfs(1, merge, add_node);
         assert_eq!(ans, 31);
-        assert_eq!(graph.dfs(6, merge, add_node), 34, "The total weight from node 6 should be 34");
+        assert_eq!(
+            graph.dfs(6, merge, add_node),
+            34,
+            "The total weight from node 6 should be 34"
+        );
     }
 
     #[test]
@@ -250,27 +245,30 @@ mod tests {
     // グリッドグラフで連結か判定
     #[test]
     fn test_grid_graph_connected() {
-
-        let g = vec![
-            vec![1, 0, 0],
-            vec![1, 1, 0],
-            vec![0, 1, 1],
-        ];
+        let g = vec![vec![1, 0, 0], vec![1, 1, 0], vec![0, 1, 1]];
 
         let graph = gen_grid_graph(g, |&x| x == 1);
 
         let merge = |a: bool, b: bool| a || b;
-        let add_node = |res: bool, _node: &Node<(usize, usize), usize>, edge: &Edge<(usize, usize), usize>| {
-            res || edge.to == (2, 2)
-        };
+        let add_node =
+            |res: bool, _node: &Node<(usize, usize), usize>, edge: &Edge<(usize, usize), usize>| {
+                res || edge.to == (2, 2)
+            };
         let start = (0, 0);
         let result = graph.dfs(start, merge, add_node);
-        assert_eq!(result, true, "The grid graph should be connected to (2, 2) from (0, 0)");
+        assert_eq!(
+            result, true,
+            "The grid graph should be connected to (2, 2) from (0, 0)"
+        );
 
-        let add_node2 = |res: bool, _node: &Node<(usize, usize), usize>, edge: &Edge<(usize, usize), usize>| {
-            res || edge.to == (0, 2)
-        };
+        let add_node2 =
+            |res: bool, _node: &Node<(usize, usize), usize>, edge: &Edge<(usize, usize), usize>| {
+                res || edge.to == (0, 2)
+            };
         let result2 = graph.dfs(start, merge, add_node2);
-        assert_eq!(result2, false, "The grid graph should not be connected to (0, 2) from (0, 0)");
+        assert_eq!(
+            result2, false,
+            "The grid graph should not be connected to (0, 2) from (0, 0)"
+        );
     }
 }

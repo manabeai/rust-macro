@@ -1,0 +1,11 @@
+{
+  "name": "rust-macro",
+  "version": "1.0.0",
+  "description": "Rust competitive programming utilities",
+  "scripts": {
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "husky": "^8.0.3"
+  }
+}

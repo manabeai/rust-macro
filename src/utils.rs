@@ -31,7 +31,10 @@ impl<T: Ord + Clone> Compress<T> {
             .enumerate()
             .map(|(i, v)| (v.clone(), i))
             .collect();
-        Compress { mapping, rev: values }
+        Compress {
+            mapping,
+            rev: values,
+        }
     }
 
     /// 値xの圧縮後のインデックスを取得する
