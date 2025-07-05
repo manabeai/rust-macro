@@ -7,6 +7,8 @@ pub mod macro_utils;
 pub mod union_find;
 pub mod utils;
 
+pub use cumulative_sum::CumulativeSum;
+pub use graph::{Edge, Graph, Node};
+pub use imos::{Imos1D, Imos2D};
 pub use union_find::UnionFind;
-pub use utils::yesno;
-pub use utils::Compress;
+pub use utils::{yesno, Compress};
