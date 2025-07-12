@@ -9,5 +9,6 @@ repository = "https://github.com/yourusername/rust-macro"
 
 [dependencies]
 bitvec = "1.0.1"
+im-rc = "15.1.0"
 
 [dev-dependencies]
