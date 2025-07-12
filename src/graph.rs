@@ -90,11 +90,14 @@ where
     ///
     /// Performs dynamic programming calculation on a tree structure.
     /// Uses pure functional approach with immutable visited sets.
+    ///
+    /// The library handles identity element (None) operations internally.
+    /// Users only need to define operations on non-identity values.
     pub fn dp<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> Option<V>
     where
         V: Copy + std::fmt::Debug,
-        F1: Fn(Option<V>, Option<V>) -> Option<V>,
-        F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> Option<V>,
+        F1: Fn(V, V) -> V,
+        F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V,
     {
         let start_id = match self.coord_map.get(&start) {
             Some(&id) => id,
@@ -114,8 +117,8 @@ where
         ) -> Option<V>
         where
             V: Copy + std::fmt::Debug,
-            F1: Fn(Option<V>, Option<V>) -> Option<V>,
-            F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> Option<V>,
+            F1: Fn(V, V) -> V,
+            F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V,
             EW: Copy + std::fmt::Debug,
             NW: Copy + std::fmt::Debug,
         {
@@ -137,11 +140,17 @@ where
                     merge,
                     add_node,
                 );
-                result = merge(result, sub_result);
+
+                // Handle identity element operations internally
+                result = match (result, sub_result) {
+                    (Some(x), Some(y)) => Some(merge(x, y)),
+                    (Some(x), None) | (None, Some(x)) => Some(x),
+                    (None, None) => None,
+                };
             }
 
             if let Some(weight) = prev_weight {
-                add_node(result, node, Some(weight))
+                Some(add_node(result, node, Some(weight)))
             } else {
                 result
             }
@@ -214,16 +223,12 @@ mod tests {
         graph.add_edge(5, 6, Some(34));
         graph.add_edge(6, 5, Some(34));
 
-        let merge = |a: Option<usize>, b: Option<usize>| match (a, b) {
-            (Some(x), Some(y)) => Some(x + y),
-            (Some(x), None) | (None, Some(x)) => Some(x),
-            (None, None) => None,
-        };
+        let merge = |x: usize, y: usize| x + y;
         let add_node = |a: Option<usize>, _: &Node<usize>, edge_weight: Option<&usize>| {
             let weight = edge_weight.unwrap_or(&0);
             match a {
-                Some(x) => Some(x + weight),
-                None => Some(*weight),
+                Some(x) => x + weight,
+                None => *weight,
             }
         };
         let ans = graph.dp(1, merge, add_node);
@@ -245,15 +250,11 @@ mod tests {
         graph.add_edge(1, 4, Some(16));
         graph.add_edge(4, 1, Some(31));
 
-        let merge = |a: Option<bool>, b: Option<bool>| match (a, b) {
-            (Some(x), Some(y)) => Some(x || y),
-            (Some(x), None) | (None, Some(x)) => Some(x),
-            (None, None) => None,
-        };
+        let merge = |x: bool, y: bool| x || y;
 
         let _goal = 2;
         let add_node = |res: Option<bool>, _node: &Node<usize>, _edge_weight: Option<&usize>| {
-            res // Note: We can't check edge.to anymore, need different approach
+            res.unwrap_or(false) // Note: We can't check edge.to anymore, need different approach
         };
         // This test needs to be redesigned since we don't store 'to' anymore
         // For now, just test that DFS completes without error
@@ -271,18 +272,14 @@ mod tests {
 
         type V = (usize, usize);
 
-        let merge = |a: Option<V>, b: Option<V>| match (a, b) {
-            (Some((amin, amax)), Some((bmin, bmax))) => Some((min(amin, bmin), max(amax, bmax))),
-            (Some(pair), None) | (None, Some(pair)) => Some(pair),
-            _ => None,
-        };
+        let merge = |(amin, amax): V, (bmin, bmax): V| (min(amin, bmin), max(amax, bmax));
         let add_node = |res: Option<V>, _node: &Node<usize>, edge_weight: Option<&usize>| {
             let weight = edge_weight.unwrap_or(&0);
             match res {
                 Some((min_weight, max_weight)) => {
-                    Some((min(min_weight, *weight), max(max_weight, *weight)))
+                    (min(min_weight, *weight), max(max_weight, *weight))
                 }
-                None => Some((*weight, *weight)),
+                None => (*weight, *weight),
             }
         };
         let result = graph.dp(1, merge, add_node);
@@ -323,17 +320,13 @@ mod tests {
         graph.add_edge(3, 6, Some(8));
 
         // DP for minimum path sum from root to leaves
-        let merge = |a: Option<usize>, b: Option<usize>| match (a, b) {
-            (Some(x), Some(y)) => Some(x.min(y)),
-            (Some(x), None) | (None, Some(x)) => Some(x),
-            (None, None) => None,
-        };
+        let merge = |x: usize, y: usize| x.min(y);
 
         let add_node = |child_min: Option<usize>, _node: &Node<()>, edge_weight: Option<&usize>| {
             let edge_cost = edge_weight.unwrap_or(&0);
             match child_min {
-                Some(min_val) => Some(edge_cost + min_val),
-                None => Some(*edge_cost), // Leaf node
+                Some(min_val) => edge_cost + min_val,
+                None => *edge_cost, // Leaf node
             }
         };
 
@@ -355,17 +348,13 @@ mod tests {
         graph.add_edge(3, 6, Some(8));
 
         // DP for maximum path sum from root to leaves
-        let merge = |a: Option<usize>, b: Option<usize>| match (a, b) {
-            (Some(x), Some(y)) => Some(x.max(y)),
-            (Some(x), None) | (None, Some(x)) => Some(x),
-            (None, None) => None,
-        };
+        let merge = |x: usize, y: usize| x.max(y);
 
         let add_node = |child_max: Option<usize>, _node: &Node<()>, edge_weight: Option<&usize>| {
             let edge_cost = edge_weight.unwrap_or(&0);
             match child_max {
-                Some(max_val) => Some(edge_cost + max_val),
-                None => Some(*edge_cost), // Leaf node
+                Some(max_val) => edge_cost + max_val,
+                None => *edge_cost, // Leaf node
             }
         };
 
