@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use bitvec::prelude::*;
+use std::collections::BTreeMap;
 
 /// 値の座圧（座標圧縮）を行う構造体
 #[derive(Debug, Clone)]
