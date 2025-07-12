@@ -8,5 +8,6 @@ license = "MIT"
 repository = "https://github.com/yourusername/rust-macro"
 
 [dependencies]
+bitvec = "1.0.1"
 
 [dev-dependencies]

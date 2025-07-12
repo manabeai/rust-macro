@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use bitvec::prelude::*;
 
 /// 値の座圧（座標圧縮）を行う構造体
 #[derive(Debug, Clone)]
@@ -63,4 +64,16 @@ pub fn yesno(b: bool) {
     } else {
         println!("No");
     }
+}
+
+pub fn fmt_bitvec(bits: &BitVec<usize, Msb0>) -> String {
+    bits.iter().map(|b| if *b { '1' } else { '0' }).collect()
+}
+
+pub fn fmt_u2bit(bits: usize) -> String {
+    let mut s = String::new();
+    for i in (0..30).rev() {
+        s.push(if (bits >> i) & 1 == 1 { '1' } else { '0' });
+    }
+    s
 }
