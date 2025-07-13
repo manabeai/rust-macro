@@ -77,3 +77,53 @@ pub fn fmt_u2bit(bits: usize) -> String {
     }
     s
 }
+
+/// イテレータを受け取って回文であるか判定する
+pub fn is_palindrome<I, T>(iter: I) -> bool
+where
+    I: IntoIterator<Item = T>,
+    T: PartialEq,
+{
+    let items: Vec<T> = iter.into_iter().collect();
+    items.iter().eq(items.iter().rev())
+}
+
+/// 10進数をb進数に変換して返す
+pub fn to_base(mut n: usize, base: usize) -> Vec<usize> {
+    if n == 0 {
+        return vec![0];
+    }
+    let mut digits = Vec::new();
+    while n > 0 {
+        digits.push(n % base);
+        n /= base;
+    }
+    digits.reverse();
+    digits
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_palindrome() {
+        assert!(is_palindrome(vec![1, 2, 3, 2, 1]));
+        assert!(is_palindrome(vec![1, 2, 2, 1]));
+        assert!(is_palindrome(vec![5]));
+        assert!(is_palindrome(Vec::<i32>::new()));
+        assert!(!is_palindrome(vec![1, 2, 3, 4]));
+        assert!(is_palindrome("racecar".chars()));
+        assert!(!is_palindrome("hello".chars()));
+    }
+
+    #[test]
+    fn test_to_base() {
+        assert_eq!(to_base(0, 2), vec![0]);
+        assert_eq!(to_base(10, 2), vec![1, 0, 1, 0]);
+        assert_eq!(to_base(255, 16), vec![15, 15]);
+        assert_eq!(to_base(8, 3), vec![2, 2]);
+        assert_eq!(to_base(27, 3), vec![1, 0, 0, 0]);
+        assert_eq!(to_base(123, 10), vec![1, 2, 3]);
+    }
+}
