@@ -1,5 +1,5 @@
 use im_rc::HashSet as ImHashSet;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -28,25 +28,19 @@ pub struct Node<NW> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Graph<I: std::fmt::Debug, EW: std::fmt::Debug, NW: std::fmt::Debug, T: GraphType> {
-    pub coord_map: HashMap<I, usize>,
+pub struct Graph<I: Debug, EW: Debug, NW: Debug, T: GraphType> {
+    pub coord_map: FxHashMap<I, usize>,
     pub reverse_map: Vec<I>,
     pub nodes: Vec<Node<NW>>,
     pub adj: Vec<Vec<(usize, Option<EW>)>>,
     _phantom: PhantomData<T>,
 }
 
-impl<
-        I: Clone + Eq + Hash + std::fmt::Debug,
-        EW: std::fmt::Debug,
-        NW: std::fmt::Debug,
-        T: GraphType,
-    > Graph<I, EW, NW, T>
-{
+impl<I: Clone + Eq + Hash + Debug, EW: Debug, NW: Debug, T: GraphType> Graph<I, EW, NW, T> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Graph {
-            coord_map: HashMap::new(),
+            coord_map: FxHashMap::default(),
             reverse_map: Vec::new(),
             nodes: Vec::new(),
             adj: Vec::new(),
