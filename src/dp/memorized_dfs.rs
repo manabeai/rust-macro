@@ -163,7 +163,7 @@ mod tests {
         );
         let mut sorted_result = result;
         sorted_result.sort();
-        assert_eq!(sorted_result, vec![3, 4, 5]);
+        assert_eq!(sorted_result, vec![3, 4, 5, 6]);
     }
 
     #[test]
@@ -222,6 +222,112 @@ mod tests {
             |s: &String| s.len(),
             false,
         );
-        assert_eq!(result, vec![4, 4]);
+        assert_eq!(result, vec![4]);
+    }
+
+    #[test]
+    fn test_search_with_best_find_minimum() {
+        let result = MemoizedDFS::search_with_best(
+            0,
+            |&x| if x < 5 { vec![x + 1, x + 2] } else { vec![] },
+            |&x| x >= 3,
+            |&x| x,
+            |a, b| a < b,
+        );
+        assert_eq!(result, Some(3));
+    }
+
+    #[test]
+    fn test_search_with_best_find_maximum() {
+        let result = MemoizedDFS::search_with_best(
+            0,
+            |&x| if x < 5 { vec![x + 1, x + 2] } else { vec![] },
+            |&x| x >= 3,
+            |&x| x,
+            |a, b| a > b,
+        );
+        assert_eq!(result, Some(6));
+    }
+
+    #[test]
+    fn test_search_with_best_no_goals() {
+        let result = MemoizedDFS::search_with_best(
+            0,
+            |&x| if x < 3 { vec![x + 1] } else { vec![] },
+            |&x| x > 10,
+            |&x| x,
+            |a, b| a < b,
+        );
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_search_with_best_string_values() {
+        let result = MemoizedDFS::search_with_best(
+            0,
+            |&x| if x < 3 { vec![x + 1] } else { vec![] },
+            |&x| x >= 1,
+            |&x| format!("value_{}", x),
+            |a, b| a.len() > b.len(),
+        );
+        assert_eq!(result, Some("value_1".to_string()));
+    }
+
+    #[test]
+    fn test_search_with_best_cycle_handling() {
+        let result = MemoizedDFS::search_with_best(
+            0,
+            |&x| match x {
+                0 => vec![1, 2],
+                1 => vec![3, 0], // Creates cycle back to 0
+                2 => vec![4],
+                _ => vec![],
+            },
+            |&x| x >= 3,
+            |&x| x * 10,
+            |a, b| a > b,
+        );
+        assert_eq!(result, Some(40));
+    }
+
+    #[test]
+    fn test_empty_start_transitions() {
+        let result = MemoizedDFS::search(
+            42,
+            |_| vec![],
+            |&x| x == 42,
+            |&x| x,
+            false,
+        );
+        assert_eq!(result, vec![42]);
+    }
+
+    #[test]
+    fn test_complex_graph_structure() {
+        #[derive(Clone, Hash, Eq, PartialEq)]
+        struct Node {
+            id: i32,
+            value: i32,
+        }
+
+        let start = Node { id: 0, value: 10 };
+        let result = MemoizedDFS::search_with_best(
+            start,
+            |node| {
+                match node.id {
+                    0 => vec![
+                        Node { id: 1, value: 20 },
+                        Node { id: 2, value: 15 }
+                    ],
+                    1 => vec![Node { id: 3, value: 30 }],
+                    2 => vec![Node { id: 3, value: 25 }],
+                    _ => vec![],
+                }
+            },
+            |node| node.id == 3,
+            |node| node.value,
+            |a, b| a > b,
+        );
+        assert_eq!(result, Some(30));
     }
 }

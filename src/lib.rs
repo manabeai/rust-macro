@@ -9,7 +9,7 @@ pub mod union_find;
 pub mod utils;
 
 pub use cumulative_sum::{CumulativeSum, CumulativeSum2D};
-pub use dp::DigitDP;
+pub use dp::{DigitDP, MemoizedDFS};
 pub use graph::{Directed, Graph, Node, Tree, Undirected};
 pub use imos::{Imos1D, Imos2D};
 pub use union_find::{PersistentUnionFind, UnionFind};
