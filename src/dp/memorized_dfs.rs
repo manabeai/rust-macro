@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-use std::hash::Hash;
 
 pub struct MemoizedDFS;
 impl MemoizedDFS {
@@ -11,18 +9,23 @@ impl MemoizedDFS {
         return_on_first: bool,
     ) -> Vec<A>
     where
-        T: Clone + Hash + Eq,
+        T: Clone + std::hash::Hash + Eq,
         A: Clone,
         FTrans: Fn(&T) -> Vec<T>,
         FGoal: Fn(&T) -> bool,
         FCollect: Fn(&T) -> A,
     {
-        let mut visited = HashSet::new();
+        use std::collections::HashSet;
+        use std::hash::BuildHasherDefault;
+        use rustc_hash::FxHasher;
+        type Hasher = BuildHasherDefault<FxHasher>;
+        
+        let mut visited = HashSet::with_hasher(Hasher::default());
         let mut result = vec![];
 
         fn dfs<T, A, FTrans, FGoal, FCollect>(
             current: T,
-            visited: &mut HashSet<T>,
+            visited: &mut HashSet<T, Hasher>,
             result: &mut Vec<A>,
             trans: &FTrans,
             is_goal: &FGoal,
@@ -30,7 +33,7 @@ impl MemoizedDFS {
             return_on_first: bool,
         ) -> bool
         where
-            T: Clone + Hash + Eq,
+            T: Clone + std::hash::Hash + Eq,
             A: Clone,
             FTrans: Fn(&T) -> Vec<T>,
             FGoal: Fn(&T) -> bool,
@@ -77,26 +80,31 @@ impl MemoizedDFS {
         is_better: FCompare,
     ) -> Option<A>
     where
-        T: Clone + Hash + Eq,
+        T: Clone + std::hash::Hash + Eq,
         A: Clone,
         FTrans: Fn(&T) -> Vec<T>,
         FGoal: Fn(&T) -> bool,
         FCollect: Fn(&T) -> A,
         FCompare: Fn(&A, &A) -> bool,
     {
-        let mut visited = HashSet::new();
+        use std::collections::HashSet;
+        use std::hash::BuildHasherDefault;
+        use rustc_hash::FxHasher;
+        type Hasher = BuildHasherDefault<FxHasher>;
+        
+        let mut visited = HashSet::with_hasher(Hasher::default());
         let mut best: Option<A> = None;
 
         fn dfs<T, A, FTrans, FGoal, FCollect, FCompare>(
             current: T,
-            visited: &mut HashSet<T>,
+            visited: &mut HashSet<T, Hasher>,
             best: &mut Option<A>,
             trans: &FTrans,
             is_goal: &FGoal,
             collect: &FCollect,
             is_better: &FCompare,
         ) where
-            T: Clone + Hash + Eq,
+            T: Clone + std::hash::Hash + Eq,
             A: Clone,
             FTrans: Fn(&T) -> Vec<T>,
             FGoal: Fn(&T) -> bool,
