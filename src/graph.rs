@@ -82,7 +82,6 @@ pub trait TreeDP<I, EW, NW> {
         F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V;
 }
 
-
 // Tree-specific implementation for TreeDP
 impl<I, EW, NW> TreeDP<I, EW, NW> for Graph<I, EW, NW, Tree>
 where
