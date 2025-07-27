@@ -67,9 +67,7 @@ fn test_min_max_weights() {
     let add_node = |res: Option<V>, _node: &Node<usize>, edge_weight: Option<&usize>| {
         let weight = edge_weight.unwrap_or(&0);
         match res {
-            Some((min_weight, max_weight)) => {
-                (min(min_weight, *weight), max(max_weight, *weight))
-            }
+            Some((min_weight, max_weight)) => (min(min_weight, *weight), max(max_weight, *weight)),
             None => (*weight, *weight),
         }
     };
