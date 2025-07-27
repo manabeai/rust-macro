@@ -1,7 +1,8 @@
 use im_rc::HashSet as ImHashSet;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHasher;
+use std::collections::HashMap;
 use std::fmt::Debug;
-use std::hash::Hash;
+use std::hash::{BuildHasherDefault, Hash};
 use std::marker::PhantomData;
 
 pub trait GraphType {}
@@ -29,7 +30,7 @@ pub struct Node<NW> {
 
 #[derive(Debug, Clone)]
 pub struct Graph<I: Debug, EW: Debug, NW: Debug, T: GraphType> {
-    pub coord_map: FxHashMap<I, usize>,
+    pub coord_map: HashMap<I, usize, BuildHasherDefault<FxHasher>>,
     pub reverse_map: Vec<I>,
     pub nodes: Vec<Node<NW>>,
     pub adj: Vec<Vec<(usize, Option<EW>)>>,
@@ -40,7 +41,7 @@ impl<I: Clone + Eq + Hash + Debug, EW: Debug, NW: Debug, T: GraphType> Graph<I, 
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Graph {
-            coord_map: FxHashMap::default(),
+            coord_map: HashMap::<I, usize, BuildHasherDefault<FxHasher>>::default(),
             reverse_map: Vec::new(),
             nodes: Vec::new(),
             adj: Vec::new(),

@@ -1,4 +1,3 @@
-
 pub struct MemoizedDFS;
 impl MemoizedDFS {
     pub fn search<T, A, FTrans, FGoal, FCollect>(
@@ -15,11 +14,11 @@ impl MemoizedDFS {
         FGoal: Fn(&T) -> bool,
         FCollect: Fn(&T) -> A,
     {
+        use rustc_hash::FxHasher;
         use std::collections::HashSet;
         use std::hash::BuildHasherDefault;
-        use rustc_hash::FxHasher;
         type Hasher = BuildHasherDefault<FxHasher>;
-        
+
         let mut visited = HashSet::with_hasher(Hasher::default());
         let mut result = vec![];
 
@@ -51,7 +50,15 @@ impl MemoizedDFS {
             }
 
             for next in trans(&current) {
-                if dfs(next, visited, result, trans, is_goal, collect, return_on_first) {
+                if dfs(
+                    next,
+                    visited,
+                    result,
+                    trans,
+                    is_goal,
+                    collect,
+                    return_on_first,
+                ) {
                     return true;
                 }
             }
@@ -87,11 +94,11 @@ impl MemoizedDFS {
         FCollect: Fn(&T) -> A,
         FCompare: Fn(&A, &A) -> bool,
     {
+        use rustc_hash::FxHasher;
         use std::collections::HashSet;
         use std::hash::BuildHasherDefault;
-        use rustc_hash::FxHasher;
         type Hasher = BuildHasherDefault<FxHasher>;
-        
+
         let mut visited = HashSet::with_hasher(Hasher::default());
         let mut best: Option<A> = None;
 
@@ -117,10 +124,7 @@ impl MemoizedDFS {
 
             if is_goal(&current) {
                 let val = collect(&current);
-                if best
-                    .as_ref()
-                    .map_or(true, |b| is_better(&val, b))
-                {
+                if best.as_ref().map_or(true, |b| is_better(&val, b)) {
                     *best = Some(val);
                 }
             }
@@ -300,13 +304,7 @@ mod tests {
 
     #[test]
     fn test_empty_start_transitions() {
-        let result = MemoizedDFS::search(
-            42,
-            |_| vec![],
-            |&x| x == 42,
-            |&x| x,
-            false,
-        );
+        let result = MemoizedDFS::search(42, |_| vec![], |&x| x == 42, |&x| x, false);
         assert_eq!(result, vec![42]);
     }
 
@@ -321,16 +319,11 @@ mod tests {
         let start = Node { id: 0, value: 10 };
         let result = MemoizedDFS::search_with_best(
             start,
-            |node| {
-                match node.id {
-                    0 => vec![
-                        Node { id: 1, value: 20 },
-                        Node { id: 2, value: 15 }
-                    ],
-                    1 => vec![Node { id: 3, value: 30 }],
-                    2 => vec![Node { id: 3, value: 25 }],
-                    _ => vec![],
-                }
+            |node| match node.id {
+                0 => vec![Node { id: 1, value: 20 }, Node { id: 2, value: 15 }],
+                1 => vec![Node { id: 3, value: 30 }],
+                2 => vec![Node { id: 3, value: 25 }],
+                _ => vec![],
             },
             |node| node.id == 3,
             |node| node.value,
