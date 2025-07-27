@@ -73,7 +73,6 @@ impl<I: Clone + Eq + Hash + Debug, EW: Debug, NW: Debug, T: GraphType> Graph<I, 
     }
 }
 
-
 // Tree-specific implementation for tree DP
 pub trait TreeDP<I, EW, NW> {
     fn dp<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> Option<V>
@@ -82,7 +81,6 @@ pub trait TreeDP<I, EW, NW> {
         F1: Fn(V, V) -> V,
         F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V;
 }
-
 
 impl<I, EW, NW> TreeDP<I, EW, NW> for Graph<I, EW, NW, Tree>
 where
@@ -101,7 +99,6 @@ where
             None => return None,
         };
 
-
         fn dp_pure<EW, NW, V, F1, F2>(
             nodes: &[Node<NW>],
             adj: &[Vec<(usize, Option<EW>)>],
@@ -117,19 +114,11 @@ where
             EW: Copy + std::fmt::Debug,
             NW: Copy + std::fmt::Debug,
         {
-
             let mut result = None;
 
             let node = &nodes[current];
             for &(next, edge_weight) in &adj[current] {
-                let sub_result = dp_pure(
-                    nodes,
-                    adj,
-                    edge_weight.as_ref(),
-                    next,
-                    merge,
-                    add_node,
-                );
+                let sub_result = dp_pure(nodes, adj, edge_weight.as_ref(), next, merge, add_node);
 
                 // Handle identity element operations internally
                 result = match (result, sub_result) {
@@ -146,14 +135,7 @@ where
             }
         }
 
-        dp_pure(
-            &self.nodes,
-            &self.adj,
-            None,
-            start_id,
-            &merge,
-            &add_node,
-        )
+        dp_pure(&self.nodes, &self.adj, None, start_id, &merge, &add_node)
     }
 }
 
@@ -378,7 +360,7 @@ mod tests {
     //     );
     // }
 
-    #[test]
+    // #[test]
     // fn test_simple_reachability() {
     //     let mut graph = Graph::<usize, usize, usize, Tree>::new();
     //     graph.add_edge(1, 2, Some(5));
@@ -398,7 +380,6 @@ mod tests {
     //     // For now, just test that DFS completes without error
     //     let _result = graph.dp(1, merge, add_node);
     // }
-
     #[test]
     fn test_min_max_weights() {
         use std::cmp::{max, min};
