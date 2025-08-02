@@ -174,7 +174,7 @@ where
     graph
 }
 
-pub use tree::TreeDP;
+pub use tree::{TreeDP, TreePreorder};
 
 #[cfg(test)]
 mod tests {
