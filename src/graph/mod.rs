@@ -1,3 +1,6 @@
+pub mod directed;
+pub mod tree;
+
 use rustc_hash::FxHasher;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -48,6 +51,10 @@ impl<I: Clone + Eq + Hash + Debug, EW: Debug, NW: Debug, T: GraphType> Graph<I, 
         }
     }
 
+    // fn key2id(&self, key: &I) -> Option<usize> {
+    //     self.coord_map.get(key).cloned()
+    // }
+
     fn get_or_create_id(&mut self, key: I) -> usize {
         if let Some(&id) = self.coord_map.get(&key) {
             id
@@ -71,235 +78,20 @@ impl<I: Clone + Eq + Hash + Debug, EW: Debug, NW: Debug, T: GraphType> Graph<I, 
         let node_id = self.get_or_create_id(id);
         self.nodes[node_id].weight = Some(weight);
     }
-}
 
-// Tree-specific implementation for tree DP
-pub trait TreeDP<I, EW, NW> {
-    fn dp<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> Option<V>
-    where
-        V: Copy + std::fmt::Debug,
-        F1: Fn(V, V) -> V,
-        F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V;
-}
-
-// Tree-specific implementation for TreeDP
-impl<I, EW, NW> TreeDP<I, EW, NW> for Graph<I, EW, NW, Tree>
-where
-    I: Clone + Eq + Hash + std::fmt::Debug,
-    EW: Copy + std::fmt::Debug,
-    NW: Copy + std::fmt::Debug,
-{
-    fn dp<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> Option<V>
-    where
-        V: Copy + std::fmt::Debug,
-        F1: Fn(V, V) -> V,
-        F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V,
-    {
-        let start_id = self.coord_map.get(&start)?;
-        let n = self.nodes.len();
-        let mut visited = vec![false; n];
-
-        fn dfs_dp<V, F1, F2, I, EW, NW>(
-            graph: &Graph<I, EW, NW, Tree>,
-            node: usize,
-            parent: Option<usize>,
-            parent_edge_weight: Option<&EW>,
-            visited: &mut [bool],
-            merge: &F1,
-            add_node: &F2,
-        ) -> V
-        where
-            V: Copy + std::fmt::Debug,
-            F1: Fn(V, V) -> V,
-            F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V,
-            I: Clone + Eq + Hash + std::fmt::Debug,
-            EW: Copy + std::fmt::Debug,
-            NW: Copy + std::fmt::Debug,
-        {
-            visited[node] = true;
-
-            let mut child_result: Option<V> = None;
-
-            for &(child, edge_weight) in &graph.adj[node] {
-                if Some(child) != parent && !visited[child] {
-                    let child_dp = dfs_dp(
-                        graph,
-                        child,
-                        Some(node),
-                        edge_weight.as_ref(),
-                        visited,
-                        merge,
-                        add_node,
-                    );
-                    child_result = Some(match child_result {
-                        Some(current) => merge(current, child_dp),
-                        None => child_dp,
-                    });
-                }
-            }
-
-            add_node(child_result, &graph.nodes[node], parent_edge_weight)
-        }
-
-        Some(dfs_dp(
-            self,
-            *start_id,
-            None,
-            None,
-            &mut visited,
-            &merge,
-            &add_node,
-        ))
-    }
-}
-
-// Directed graph specific implementation
-impl<I, EW, NW> Graph<I, EW, NW, Directed>
-where
-    I: Clone + Eq + Hash + std::fmt::Debug,
-    EW: Copy + std::fmt::Debug,
-    NW: Copy + std::fmt::Debug,
-{
-    /// Convert directed graph to DSU (Disjoint Set Union / Union-Find)
-    ///
-    /// Creates a Union-Find data structure representing the strongly connected components
-    /// of the directed graph. Two nodes are in the same component if there is a path
-    /// from one to the other and vice versa.
-    ///
-    /// # Algorithm
-    ///
-    /// Uses Kosaraju's algorithm for finding strongly connected components:
-    /// 1. **First DFS**: Compute finish times on the original graph
-    /// 2. **Transpose graph**: Reverse all edge directions
-    /// 3. **Second DFS**: Process nodes in decreasing finish time order on transposed graph
-    /// 4. **Create DSU**: Union nodes that belong to the same SCC
-    ///
-    /// # Returns
-    ///
-    /// A `UnionFind` structure where nodes in the same strongly connected component
-    /// are unioned together. Node IDs are mapped to internal indices.
-    ///
-    /// # Examples
-    ///
-    /// ## Simple Cycle
-    ///
-    /// ```rust
-    /// # use rust_macro::*;
-    /// let mut graph = Graph::<usize, (), (), Directed>::new();
-    /// // Create cycle: 1 -> 2 -> 3 -> 1
-    /// graph.add_edge(1, 2, None);
-    /// graph.add_edge(2, 3, None);
-    /// graph.add_edge(3, 1, None);
-    ///
-    /// let mut dsu = graph.to_dsu();
-    /// // All nodes should be in the same component
-    /// assert!(dsu.same(0, 1)); // Assuming 1 maps to index 0, 2 to index 1
-    /// ```
-    ///
-    /// ## Disconnected Components
-    ///
-    /// ```rust
-    /// # use rust_macro::*;
-    /// let mut graph = Graph::<usize, (), (), Directed>::new();
-    /// // Create two separate components: 1->2 and 3->4
-    /// graph.add_edge(1, 2, None);
-    /// graph.add_edge(3, 4, None);
-    ///
-    /// let dsu = graph.to_dsu();
-    /// // Nodes in different components should not be connected
-    /// // (exact indices depend on internal mapping)
-    /// ```
-    ///
-    /// # Time Complexity
-    ///
-    /// - **O(V + E)** where V is vertices and E is edges
-    /// - Uses two DFS traversals for Kosaraju's algorithm
-    ///
-    /// # Space Complexity
-    ///
-    /// - **O(V)** for the DSU structure and auxiliary data structures
-    ///
-    /// # Notes
-    ///
-    /// - Only works on `Directed` graph types (compile-time restriction)
-    /// - The returned DSU uses internal node indices (0 to n-1)
-    /// - Self-loops and multiple edges are handled correctly
-    pub fn to_dsu(&self) -> crate::UnionFind {
-        use crate::UnionFind;
-
-        let n = self.nodes.len();
-        if n == 0 {
-            return UnionFind::new(0);
-        }
-
-        // Step 1: First DFS to compute finish times
-        let mut visited = vec![false; n];
-        let mut finish_order = Vec::new();
-
-        for i in 0..n {
-            if !visited[i] {
-                self.dfs1(i, &mut visited, &mut finish_order);
-            }
-        }
-
-        // Step 2: Create transposed graph
-        let mut transposed_adj = vec![Vec::new(); n];
-        for (from, edges) in self.adj.iter().enumerate() {
-            for &(to, _) in edges {
-                transposed_adj[to].push(from);
-            }
-        }
-
-        // Step 3: Second DFS on transposed graph in reverse finish order
-        let mut visited2 = vec![false; n];
-        let mut dsu = UnionFind::new(n);
-
-        for &node in finish_order.iter().rev() {
-            if !visited2[node] {
-                let mut component = Vec::new();
-                self.dfs2(node, &transposed_adj, &mut visited2, &mut component);
-
-                // Union all nodes in this SCC
-                for &other in component.iter().skip(1) {
-                    dsu.unite(component[0], other);
-                }
-            }
-        }
-
-        dsu
+    pub fn get_node_weight(&self, id: &I) -> Option<&NW> {
+        self.coord_map
+            .get(id)
+            .and_then(|&node_id| self.nodes[node_id].weight.as_ref())
     }
 
-    // Helper function for first DFS (finish time computation)
-    fn dfs1(&self, node: usize, visited: &mut [bool], finish_order: &mut Vec<usize>) {
-        visited[node] = true;
-
-        for &(next, _) in &self.adj[node] {
-            if !visited[next] {
-                self.dfs1(next, visited, finish_order);
-            }
-        }
-
-        finish_order.push(node);
+    pub fn get_node(&self, id: &I) -> Option<&Node<NW>> {
+        self.coord_map.get(id).map(|&node_id| &self.nodes[node_id])
     }
 
-    // Helper function for second DFS (SCC extraction)
-    #[allow(clippy::only_used_in_recursion)]
-    fn dfs2(
-        &self,
-        node: usize,
-        transposed_adj: &[Vec<usize>],
-        visited: &mut [bool],
-        component: &mut Vec<usize>,
-    ) {
-        visited[node] = true;
-        component.push(node);
-
-        for &next in &transposed_adj[node] {
-            if !visited[next] {
-                self.dfs2(next, transposed_adj, visited, component);
-            }
-        }
-    }
+    // pub fn get_adjacent_nodes(&self, id: &I) -> Option<&[(usize, Option<EW>)]> {
+    //     self.coord_map.get(id).map(|&node_id| &self.adj[node_id])
+    // }
 }
 
 #[allow(dead_code)]
@@ -339,68 +131,31 @@ where
     graph
 }
 
+pub use tree::TreeDP;
+
 #[cfg(test)]
 mod tests {
     use std::vec;
 
     use super::*;
 
-    // #[test]
-    // fn test_simple_path() {
-    //     let mut graph = Graph::<usize, usize, usize, Tree>::new();
-    //     graph.add_edge(1, 2, Some(5));
-    //     graph.add_edge(2, 1, Some(5));
-    //     graph.add_edge(2, 3, Some(10));
-    //     graph.add_edge(3, 2, Some(10));
-    //     graph.add_edge(1, 4, Some(16));
-    //     graph.add_edge(4, 1, Some(16));
-    //     graph.add_edge(5, 6, Some(34));
-    //     graph.add_edge(6, 5, Some(34));
+    #[test]
+    fn test_graph_creation() {
+        let mut graph = Graph::<usize, usize, usize, Undirected>::new();
+        graph.add_edge(1, 2, Some(5));
+        graph.add_edge(2, 3, Some(10));
+        graph.add_weight_to_node(1, 5);
+        graph.add_weight_to_node(2, 10);
 
-    //     let merge = |x: usize, y: usize| x + y;
-    //     let add_node = |a: Option<usize>, _: &Node<usize>, edge_weight: Option<&usize>| {
-    //         let weight = edge_weight.unwrap_or(&0);
-    //         match a {
-    //             Some(x) => x + weight,
-    //             None => *weight,
-    //         }
-    //     };
-    //     let ans = graph.dp(1, merge, add_node);
-    //     assert_eq!(ans, Some(31));
-    //     assert_eq!(
-    //         graph.dp(6, merge, add_node),
-    //         Some(34),
-    //         "The total weight from node 6 should be 34"
-    //     );
-    // }
+        assert_eq!(graph.get_node_weight(&1), Some(&5));
+    }
 
-    // #[test]
-    // fn test_simple_reachability() {
-    //     let mut graph = Graph::<usize, usize, usize, Tree>::new();
-    //     graph.add_edge(1, 2, Some(5));
-    //     graph.add_edge(2, 1, Some(5));
-    //     graph.add_edge(2, 3, Some(10));
-    //     graph.add_edge(3, 2, Some(10));
-    //     graph.add_edge(1, 4, Some(16));
-    //     graph.add_edge(4, 1, Some(31));
-
-    //     let merge = |x: bool, y: bool| x || y;
-
-    //     let _goal = 2;
-    //     let add_node = |res: Option<bool>, _node: &Node<usize>, _edge_weight: Option<&usize>| {
-    //         res.unwrap_or(false) // Note: We can't check edge.to anymore, need different approach
-    //     };
-    //     // This test needs to be redesigned since we don't store 'to' anymore
-    //     // For now, just test that DFS completes without error
-    //     let _result = graph.dp(1, merge, add_node);
-    // }
     #[test]
     fn test_min_max_weights() {
         use std::cmp::{max, min};
         let mut graph = Graph::<usize, usize, usize, Tree>::new();
         graph.add_edge(1, 2, Some(5));
         graph.add_edge(2, 3, Some(10));
-        // graph.add_edge(1, 3, Some(15));
         graph.add_edge(2, 4, Some(20));
 
         type V = (usize, usize);
