@@ -6,20 +6,20 @@ use super::{Graph, Node, Tree};
 pub trait TreeDP<I, EW, NW> {
     fn dp<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> Option<V>
     where
-        V: Copy + std::fmt::Debug,
+        V: Copy,
         F1: Fn(V, V) -> V,
         F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V;
 }
 
 impl<I, EW, NW> TreeDP<I, EW, NW> for Graph<I, EW, NW, Tree>
 where
-    I: Clone + Eq + Hash + std::fmt::Debug,
-    EW: Copy + std::fmt::Debug,
-    NW: Copy + std::fmt::Debug,
+    I: Clone + Eq + Hash,
+    EW: Copy,
+    NW: Copy,
 {
     fn dp<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> Option<V>
     where
-        V: Copy + std::fmt::Debug,
+        V: Copy,
         F1: Fn(V, V) -> V,
         F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V,
     {
@@ -37,12 +37,12 @@ where
             add_node: &F2,
         ) -> V
         where
-            V: Copy + std::fmt::Debug,
+            V: Copy,
             F1: Fn(V, V) -> V,
             F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V,
-            I: Clone + Eq + Hash + std::fmt::Debug,
-            EW: Copy + std::fmt::Debug,
-            NW: Copy + std::fmt::Debug,
+            I: Clone + Eq + Hash,
+            EW: Copy,
+            NW: Copy,
         {
             visited[node] = true;
 
@@ -84,19 +84,19 @@ where
 pub trait TreePreorder<I, EW, NW> {
     fn preorder<V, F>(&self, start: I, calculate: F) -> HashMap<I, V>
     where
-        V: Clone + std::fmt::Debug,
+        V: Clone,
         F: Fn(&Node<NW>, Option<&EW>) -> V;
 }
 
 impl<I, EW, NW> TreePreorder<I, EW, NW> for Graph<I, EW, NW, Tree>
 where
-    I: Clone + Eq + Hash + std::fmt::Debug,
-    EW: Copy + std::fmt::Debug,
-    NW: Copy + std::fmt::Debug,
+    I: Clone + Eq + Hash,
+    EW: Copy,
+    NW: Copy,
 {
     fn preorder<V, F>(&self, start: I, calculate: F) -> HashMap<I, V>
     where
-        V: Clone + std::fmt::Debug,
+        V: Clone,
         F: Fn(&Node<NW>, Option<&EW>) -> V,
     {
         let mut result = HashMap::new();
@@ -114,11 +114,11 @@ where
                 calculate: &F,
                 result: &mut HashMap<I, V>,
             ) where
-                V: Clone + std::fmt::Debug,
+                V: Clone,
                 F: Fn(&Node<NW>, Option<&EW>) -> V,
-                I: Clone + Eq + Hash + std::fmt::Debug,
-                EW: Copy + std::fmt::Debug,
-                NW: Copy + std::fmt::Debug,
+                I: Clone + Eq + Hash,
+                EW: Copy,
+                NW: Copy,
             {
                 visited[node] = true;
 

@@ -31,7 +31,7 @@ pub struct Node<NW> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Graph<I: Debug, EW: Debug, NW: Debug, T: GraphType> {
+pub struct Graph<I, EW, NW, T: GraphType> {
     pub coord_map: HashMap<I, usize, BuildHasherDefault<FxHasher>>,
     pub reverse_map: Vec<I>,
     pub nodes: Vec<Node<NW>>,
@@ -39,7 +39,7 @@ pub struct Graph<I: Debug, EW: Debug, NW: Debug, T: GraphType> {
     _phantom: PhantomData<T>,
 }
 
-impl<I: Clone + Eq + Hash + Debug, EW: Debug, NW: Debug, T: GraphType> Graph<I, EW, NW, T> {
+impl<I: Clone + Eq + Hash, EW, NW, T: GraphType> Graph<I, EW, NW, T> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Graph {
@@ -143,7 +143,7 @@ fn gen_grid_graph<V, F, T>(
     is_connectable: F,
 ) -> Graph<(usize, usize), usize, V, T>
 where
-    V: Clone + Debug,
+    V: Clone,
     F: Fn(&V) -> bool,
     T: GraphType,
 {

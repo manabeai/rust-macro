@@ -4,9 +4,9 @@ use super::{Directed, Graph};
 
 impl<I, EW, NW> Graph<I, EW, NW, Directed>
 where
-    I: Clone + Eq + Hash + std::fmt::Debug,
-    EW: Copy + std::fmt::Debug,
-    NW: Copy + std::fmt::Debug,
+    I: Clone + Eq + Hash,
+    EW: Copy,
+    NW: Copy,
 {
     /// Convert directed graph to DSU (Disjoint Set Union / Union-Find)
     ///
