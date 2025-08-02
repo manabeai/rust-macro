@@ -44,29 +44,81 @@ impl<I: Clone + Eq + Hash + Debug, EW: Debug, NW: Debug, T: GraphType> Graph<I, 
     pub fn new() -> Self {
         Graph {
             coord_map: HashMap::<I, usize, BuildHasherDefault<FxHasher>>::default(),
-            reverse_map: Vec::new(),
+            reverse_map: Vec::<I>::new(),
             nodes: Vec::new(),
             adj: Vec::new(),
             _phantom: PhantomData,
         }
     }
 
-    // fn key2id(&self, key: &I) -> Option<usize> {
-    //     self.coord_map.get(key).cloned()
+    // pub fn with_capacity<Iter, NW>(iter: Iter, weight: NW) -> Self
+    // where
+    //     Iter: IntoIterator<Item = I>,
+    // {
+    //     let mut graph = Graph {
+    //         coord_map: HashMap::<I, usize, BuildHasherDefault<FxHasher>>::default(),
+    //         reverse_map: Vec::new(),
+    //         nodes: Vec::new(),
+    //         adj: Vec::new(),
+    //         _phantom: PhantomData,
+    //     };
+
+    //     for item in iter {
+    //         let id = graph.create_id(item);
+    //         graph.add_weight_to_node(id, weight.clone());
+    //     }
+    //     graph
     // }
 
-    fn get_or_create_id(&mut self, key: I) -> usize {
-        if let Some(&id) = self.coord_map.get(&key) {
-            id
-        } else {
-            let id = self.reverse_map.len();
-            self.coord_map.insert(key.clone(), id);
-            self.reverse_map.push(key);
-            self.nodes.push(Node { weight: None });
-            self.adj.push(Vec::new());
-            id
-        }
+    fn key2id(&self, key: &I) -> Option<usize> {
+        self.coord_map.get(key).copied()
     }
+
+    pub fn get_node(&self, key: I) -> Option<&Node<NW>> {
+        self.key2id(&key).and_then(|id| self.nodes.get(id))
+    }
+
+    pub fn get_node_mut(&mut self, key: I) -> Option<&mut Node<NW>> {
+        self.key2id(&key).and_then(|id| self.nodes.get_mut(id))
+    }
+
+    // pub fn create_node(&mut self, weight: NW) -> usize {
+    //     let id = self.reverse_map.len();
+    //     self.reverse_map.push(weight);
+    //     self.nodes.push(Node { weight: Some(weight) });
+    //     self.adj.push(Vec::new());
+    //     id
+    // }
+
+    fn create_id(&mut self, key: I) -> Option<usize> {
+        if let Some(&id) = self.coord_map.get(&key) {
+            return Some(id);
+        }
+        let id = self.reverse_map.len();
+        self.coord_map.insert(key.clone(), id);
+        self.reverse_map.push(key);
+        self.nodes.push(Node { weight: None });
+        self.adj.push(Vec::new());
+        Some(id)
+    }
+
+    fn get_id(&mut self, key: I) -> Option<usize> {
+        self.coord_map.get(&key).copied()
+    }
+
+    pub fn get_or_create_id(&mut self, key: I) -> usize {
+        self.get_id(key.clone())
+            .unwrap_or_else(|| self.create_id(key).unwrap())
+    }
+
+    // fn create_id(&mut self, key: I) -> usize {
+    //     let id = self.reverse_map.len();
+    //     self.coord_map.insert(key.clone(), id);
+    //     self.reverse_map.push(key);
+    //     self.nodes.push(Node { weight: None });
+    //     self.adj.push(Vec::new());
+    //     id
+    // }
 
     pub fn add_edge(&mut self, from: I, to: I, weight: Option<EW>) {
         let from_id = self.get_or_create_id(from);
@@ -80,18 +132,9 @@ impl<I: Clone + Eq + Hash + Debug, EW: Debug, NW: Debug, T: GraphType> Graph<I, 
     }
 
     pub fn get_node_weight(&self, id: &I) -> Option<&NW> {
-        self.coord_map
-            .get(id)
-            .and_then(|&node_id| self.nodes[node_id].weight.as_ref())
+        self.key2id(id)
+            .and_then(|node_id| self.nodes[node_id].weight.as_ref())
     }
-
-    pub fn get_node(&self, id: &I) -> Option<&Node<NW>> {
-        self.coord_map.get(id).map(|&node_id| &self.nodes[node_id])
-    }
-
-    // pub fn get_adjacent_nodes(&self, id: &I) -> Option<&[(usize, Option<EW>)]> {
-    //     self.coord_map.get(id).map(|&node_id| &self.adj[node_id])
-    // }
 }
 
 #[allow(dead_code)]
@@ -139,15 +182,44 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_graph_creation() {
+    fn setup_graph() -> Graph<usize, usize, usize, Undirected> {
         let mut graph = Graph::<usize, usize, usize, Undirected>::new();
         graph.add_edge(1, 2, Some(5));
         graph.add_edge(2, 3, Some(10));
         graph.add_weight_to_node(1, 5);
         graph.add_weight_to_node(2, 10);
+        graph
+    }
+
+    #[test]
+    fn test_graph_creation() {
+        let mut graph = Graph::<usize, usize, usize, Undirected>::new();
+        graph.add_edge(1, 2, Some(5));
+        graph.add_edge(2, 3, Some(10));
+
+        graph.add_weight_to_node(1, 5);
+        graph.add_weight_to_node(2, 10);
 
         assert_eq!(graph.get_node_weight(&1), Some(&5));
+    }
+
+    #[test]
+    fn test_add_edge() {
+        let mut graph = Graph::<usize, usize, usize, Undirected>::new();
+        graph.add_edge(1, 2, Some(5));
+        graph.add_weight_to_node(1, 5);
+        assert_eq!(graph.get_node_weight(&1), Some(&5));
+    }
+
+    #[test]
+    fn test_get_node() {
+        let mut graph = Graph::<usize, usize, usize, Undirected>::new();
+        graph.add_edge(1, 2, Some(5));
+        graph.add_weight_to_node(1, 5);
+
+        assert!(graph.get_node(1).is_some());
+        assert!(graph.get_node(1).unwrap().weight.unwrap() == 5);
+        assert!(graph.get_node(2).unwrap().weight.is_none());
     }
 
     #[test]
