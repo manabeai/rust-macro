@@ -1,5 +1,37 @@
 const MOD: usize = 1_000_000_007;
 
+/// 桁DPの問題定義を表すトレイト
+///
+/// このトレイトを実装することで、特定の条件を満たす数の個数を数える問題を定義できます。
+pub trait DigitDPRules {
+    /// 桁DPの状態を表す型。ハッシュ可能で比較可能である必要があります。
+    type State: Clone + Eq + std::hash::Hash;
+
+    /// 初期状態を返します。
+    fn init(&self) -> Self::State;
+
+    /// 状態遷移関数。
+    ///
+    /// # 引数
+    /// * `i` - 現在の桁位置 (0-indexed)
+    /// * `tight` - tight制約が有効かどうか
+    /// * `state` - 現在の状態
+    /// * `lim` - 現在の桁に入れられる数字の上限 (0-9)
+    ///
+    /// # 戻り値
+    /// (次の桁の数字, 次の状態) のペアのベクター
+    fn transition(
+        &self,
+        i: usize,
+        tight: bool,
+        state: &Self::State,
+        lim: u32,
+    ) -> Vec<(u32, Self::State)>;
+
+    /// 最終状態が受理可能かどうかを判定します。
+    fn is_accept(&self, state: &Self::State) -> bool;
+}
+
 /// 桁DP（Digit Dynamic Programming）を実装する構造体
 ///
 /// 桁DPは、数値の各桁を順番に決定していく動的プログラミング手法です。
@@ -7,42 +39,6 @@ const MOD: usize = 1_000_000_007;
 pub struct DigitDP;
 
 impl DigitDP {
-    /// 桁DPを用いて条件を満たす数の個数を計算します
-    ///
-    /// # 引数
-    ///
-    /// * `upper` - 上限値を表す文字列（例: "999"）
-    /// * `init` - 初期状態
-    /// * `trans` - 状態遷移関数。現在の位置、tight制約、現在の状態、桁の上限を受け取り、
-    ///            可能な次の桁と次の状態のペアのベクターを返す
-    /// * `accept` - 受理条件を判定する関数。最終状態を受け取り、条件を満たすかどうかを返す
-    ///
-    /// # 戻り値
-    ///
-    /// 条件を満たす数の個数（MODで割った余り）
-    ///
-    /// # 例
-    ///
-    /// ```
-    /// # use rust_macro::dp::DigitDP;
-    /// // 99以下の全ての数をカウント
-    /// let count = DigitDP::solve(
-    ///     "99",
-    ///     (),
-    ///     |_i, _tight, _state, lim| (0..=lim).map(|d| (d, ())).collect(),
-    ///     |_state| true,
-    /// );
-    /// assert_eq!(count, 100); // 0から99まで100個
-    ///
-    /// // 偶数の桁を含む数をカウント
-    /// let even_count = DigitDP::solve(
-    ///     "99",
-    ///     false,
-    ///     |_i, _tight, &has_even, lim| (0..=lim).map(|d| (d, has_even || d % 2 == 0)).collect(),
-    ///     |&has_even| has_even,
-    /// );
-    /// ```
-    ///
     /// # アルゴリズムの詳細
     ///
     /// - **tight制約**: 現在構築中の数が上限値と等しいかどうかを追跡
@@ -53,12 +49,7 @@ impl DigitDP {
     ///
     /// - 時間計算量: O(N × S × 10) ここで、Nは桁数、Sは状態数
     /// - 空間計算量: O(N × S)
-    pub fn solve<F, T, A>(upper: &str, init: T, mut trans: F, accept: A) -> usize
-    where
-        T: Clone + Eq + std::hash::Hash,
-        F: FnMut(usize, bool, &T, u32) -> Vec<(u32, T)>,
-        A: Fn(&T) -> bool,
-    {
+    pub fn solve<P: DigitDPRules>(upper: &str, problem: &P) -> usize {
         use rustc_hash::FxHasher;
         use std::collections::HashMap;
         use std::hash::BuildHasherDefault;
@@ -66,26 +57,19 @@ impl DigitDP {
 
         let digits: Vec<u32> = upper.chars().map(|c| c.to_digit(10).unwrap()).collect();
         let n = digits.len();
-        // HashMapの型を明示的に指定
-        let mut memo: HashMap<(usize, bool, T), usize, Hasher> = HashMap::default();
+        let mut memo: HashMap<(usize, bool, P::State), usize, Hasher> = HashMap::default();
 
-        fn dfs<F, T, A>(
+        fn dfs<P: DigitDPRules>(
             i: usize,
             tight: bool,
-            state: &T,
+            state: &P::State,
             digits: &Vec<u32>,
             n: usize,
-            memo: &mut HashMap<(usize, bool, T), usize, Hasher>,
-            trans: &mut F,
-            accept: &A,
-        ) -> usize
-        where
-            T: Clone + Eq + std::hash::Hash,
-            F: FnMut(usize, bool, &T, u32) -> Vec<(u32, T)>,
-            A: Fn(&T) -> bool,
-        {
+            memo: &mut HashMap<(usize, bool, P::State), usize, Hasher>,
+            problem: &P,
+        ) -> usize {
             if i == n {
-                return if accept(state) { 1 } else { 0 };
+                return if problem.is_accept(state) { 1 } else { 0 };
             }
             if let Some(&res) = memo.get(&(i, tight, state.clone())) {
                 return res;
@@ -93,26 +77,17 @@ impl DigitDP {
 
             let lim = if tight { digits[i] } else { 9 };
             let mut res = 0;
-            for (d, next_state) in trans(i, tight, state, lim) {
+            for (d, next_state) in problem.transition(i, tight, state, lim) {
                 let next_tight = tight && d == lim;
-                res =
-                    (res + dfs(
-                        i + 1,
-                        next_tight,
-                        &next_state,
-                        digits,
-                        n,
-                        memo,
-                        trans,
-                        accept,
-                    )) % MOD;
+                res = (res + dfs(i + 1, next_tight, &next_state, digits, n, memo, problem)) % MOD;
             }
 
             memo.insert((i, tight, state.clone()), res);
             res
         }
 
-        dfs(0, true, &init, &digits, n, &mut memo, &mut trans, &accept)
+        let init_state = problem.init();
+        dfs(0, true, &init_state, &digits, n, &mut memo, problem)
     }
 }
 
@@ -122,55 +97,120 @@ mod tests {
 
     #[test]
     fn test_count_all_numbers() {
-        let result = DigitDP::solve(
-            "99",
-            (),
-            |_i, _tight, _state, lim| (0..=lim).map(|d| (d, ())).collect(),
-            |_state| true,
-        );
-        assert_eq!(result, 100);
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = ();
+            fn init(&self) -> Self::State {
+                ()
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                _state: &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
+                (0..=lim).map(|d| (d, ())).collect()
+            }
+            fn is_accept(&self, _state: &Self::State) -> bool {
+                true
+            }
+        }
+        assert_eq!(DigitDP::solve("99", &Problem), 100);
     }
 
     #[test]
     fn test_count_even_numbers() {
-        let result = DigitDP::solve(
-            "10",
-            false,
-            |_i, _tight, _state, lim| (0..=lim).map(|d| (d, d % 2 == 0)).collect(),
-            |&has_even| has_even,
-        );
-        assert_eq!(result, 6);
+        // 0から10までの数の中で、その数自体が偶数であるものの個数を数える
+        // （最後の桁が偶数かどうかで判定）
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = bool; // is_even
+            fn init(&self) -> Self::State {
+                false
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                _state: &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
+                (0..=lim).map(|d| (d, d % 2 == 0)).collect()
+            }
+            fn is_accept(&self, &is_even: &Self::State) -> bool {
+                is_even
+            }
+        }
+        assert_eq!(DigitDP::solve("10", &Problem), 6);
     }
 
     #[test]
     fn test_single_digit() {
-        let result = DigitDP::solve(
-            "5",
-            (),
-            |_i, _tight, _state, lim| (0..=lim).map(|d| (d, ())).collect(),
-            |_state| true,
-        );
-        assert_eq!(result, 6);
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = ();
+            fn init(&self) -> Self::State {
+                ()
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                _state: &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
+                (0..=lim).map(|d| (d, ())).collect()
+            }
+            fn is_accept(&self, _state: &Self::State) -> bool {
+                true
+            }
+        }
+        assert_eq!(DigitDP::solve("5", &Problem), 6);
     }
 
     #[test]
     fn test_digit_sum_equals_target() {
-        let target_sum = 9;
-        let result = DigitDP::solve(
-            "99",
-            0u32,
-            |_i, _tight, &sum, lim| (0..=lim).map(|d| (d, sum + d)).collect(),
-            |&sum| sum == target_sum,
-        );
-        assert_eq!(result, 10);
+        struct Problem {
+            target_sum: u32,
+        }
+        impl DigitDPRules for Problem {
+            type State = u32; // sum
+            fn init(&self) -> Self::State {
+                0
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                &sum: &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
+                (0..=lim).map(|d| (d, sum + d)).collect()
+            }
+            fn is_accept(&self, &sum: &Self::State) -> bool {
+                sum == self.target_sum
+            }
+        }
+        assert_eq!(DigitDP::solve("99", &Problem { target_sum: 9 }), 10);
     }
 
     #[test]
     fn test_no_consecutive_same_digits() {
-        let result = DigitDP::solve(
-            "99",
-            (true, 0u32),
-            |_i, _tight, &(is_first, last_digit), lim| {
+        // 1から99までで隣り合う桁が同じでない数の個数
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = (bool, u32); // (is_first, last_digit)
+            fn init(&self) -> Self::State {
+                (true, 0)
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                &(is_first, last_digit): &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
                 if is_first {
                     (1..=lim).map(|d| (d, (false, d))).collect()
                 } else {
@@ -179,55 +219,90 @@ mod tests {
                         .map(|d| (d, (false, d)))
                         .collect()
                 }
-            },
-            |_state| true,
-        );
-        assert_eq!(result, 81);
+            }
+            fn is_accept(&self, _state: &Self::State) -> bool {
+                true
+            }
+        }
+        assert_eq!(DigitDP::solve("99", &Problem), 81);
     }
 
     #[test]
     fn test_contains_digit_7() {
-        let result = DigitDP::solve(
-            "20",
-            false,
-            |_i, _tight, &has_seven, lim| (0..=lim).map(|d| (d, has_seven || d == 7)).collect(),
-            |&has_seven| has_seven,
-        );
-        assert_eq!(result, 2);
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = bool; // has_seven
+            fn init(&self) -> Self::State {
+                false
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                &has_seven: &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
+                (0..=lim).map(|d| (d, has_seven || d == 7)).collect()
+            }
+            fn is_accept(&self, &has_seven: &Self::State) -> bool {
+                has_seven
+            }
+        }
+        assert_eq!(DigitDP::solve("20", &Problem), 2); // 7, 17
     }
 
     #[test]
     fn test_ascending_digits() {
-        let result = DigitDP::solve(
-            "999",
-            (true, 0u32),
-            |_i, _tight, &(is_first, last_digit), lim| {
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = (bool, u32); // (is_first, last_digit)
+            fn init(&self) -> Self::State {
+                (true, 0)
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                &(is_first, last_digit): &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
                 if is_first {
                     (1..=lim).map(|d| (d, (false, d))).collect()
                 } else {
                     (last_digit..=lim).map(|d| (d, (false, d))).collect()
                 }
-            },
-            |_state| true,
-        );
-        assert_eq!(result, 165);
+            }
+            fn is_accept(&self, _state: &Self::State) -> bool {
+                true
+            }
+        }
+        assert_eq!(DigitDP::solve("999", &Problem), 165);
     }
 
     #[test]
     fn test_palindrome_check() {
-        let result = DigitDP::solve(
-            "99",
-            (Vec::<u32>::new(), true),
-            |_i, _tight, (digits, _), lim| {
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = Vec<u32>;
+            fn init(&self) -> Self::State {
+                Vec::new()
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                digits: &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
                 (0..=lim)
                     .map(|d| {
                         let mut new_digits = digits.clone();
                         new_digits.push(d);
-                        (d, (new_digits, false))
+                        (d, new_digits)
                     })
                     .collect()
-            },
-            |(digits, _)| {
+            }
+            fn is_accept(&self, digits: &Self::State) -> bool {
                 if digits.is_empty() {
                     return false;
                 }
@@ -237,30 +312,56 @@ mod tests {
                     .collect();
                 let rev: String = s.chars().rev().collect();
                 s == rev
-            },
-        );
-        assert_eq!(result, 10);
+            }
+        }
+        assert_eq!(DigitDP::solve("99", &Problem), 10);
     }
 
     #[test]
     fn test_zero_case() {
-        let result = DigitDP::solve(
-            "0",
-            (),
-            |_i, _tight, _state, lim| (0..=lim).map(|d| (d, ())).collect(),
-            |_state| true,
-        );
-        assert_eq!(result, 1);
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = ();
+            fn init(&self) -> Self::State {
+                ()
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                _state: &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
+                (0..=lim).map(|d| (d, ())).collect()
+            }
+            fn is_accept(&self, _state: &Self::State) -> bool {
+                true
+            }
+        }
+        assert_eq!(DigitDP::solve("0", &Problem), 1);
     }
 
     #[test]
     fn test_large_number() {
-        let result = DigitDP::solve(
-            "1000",
-            (),
-            |_i, _tight, _state, lim| (0..=lim).map(|d| (d, ())).collect(),
-            |_state| true,
-        );
-        assert_eq!(result, 1001);
+        struct Problem;
+        impl DigitDPRules for Problem {
+            type State = ();
+            fn init(&self) -> Self::State {
+                ()
+            }
+            fn transition(
+                &self,
+                _i: usize,
+                _tight: bool,
+                _state: &Self::State,
+                lim: u32,
+            ) -> Vec<(u32, Self::State)> {
+                (0..=lim).map(|d| (d, ())).collect()
+            }
+            fn is_accept(&self, _state: &Self::State) -> bool {
+                true
+            }
+        }
+        assert_eq!(DigitDP::solve("1000", &Problem), 1001);
     }
 }
