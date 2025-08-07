@@ -1,531 +1,187 @@
+use rustc_hash::FxHasher;
 use std::collections::HashMap;
-use std::hash::Hash;
+use std::hash::{BuildHasherDefault, Hash};
 
-use super::{Graph, Node, Tree};
+use super::{Graph, Tree};
 
-pub trait TreeDP<I, EW, NW> {
-    fn dp<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> Option<V>
-    where
-        V: Copy,
-        F1: Fn(V, V) -> V,
-        F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V;
-}
-
-impl<I, EW, NW> TreeDP<I, EW, NW> for Graph<I, EW, NW, Tree>
+pub trait TreeDp<I, EW, NW>
 where
     I: Clone + Eq + Hash,
-    EW: Copy,
-    NW: Copy,
 {
-    fn dp<V, F1, F2>(&self, start: I, merge: F1, add_node: F2) -> Option<V>
-    where
-        V: Copy,
-        F1: Fn(V, V) -> V,
-        F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V,
-    {
-        let start_id = self.coord_map.get(&start)?;
-        let n = self.nodes.len();
-        let mut visited = vec![false; n];
+    /// 各ノードで計算・保持されるDP値の型。
+    /// 例えば、部分木のノード数を数えるなら `usize` になります。
+    type DpValue: Clone;
 
-        fn dfs_dp<V, F1, F2, I, EW, NW>(
-            graph: &Graph<I, EW, NW, Tree>,
-            node: usize,
-            parent: Option<usize>,
-            parent_edge_weight: Option<&EW>,
-            visited: &mut [bool],
-            merge: &F1,
-            add_node: &F2,
-        ) -> V
-        where
-            V: Copy,
-            F1: Fn(V, V) -> V,
-            F2: Fn(Option<V>, &Node<NW>, Option<&EW>) -> V,
-            I: Clone + Eq + Hash,
-            EW: Copy,
-            NW: Copy,
-        {
-            visited[node] = true;
+    /// ノードが単独で持つDPの初期値を計算します。
+    ///
+    /// これは通常、葉ノードのDP値や、マージ処理の起点となる値です。
+    /// 例えば、「部分木のサイズ」を求める問題なら、各ノードは自身（サイズ1）から始まるので
+    /// `1` を返すことになるでしょう。
+    ///
+    /// # 引数
+    /// * `node_id` - 対象ノードの内部ID (`usize`)
+    /// * `graph` - グラフ全体への参照。ノードの重み `NW` などを参照できます。
+    fn initial_value(&self) -> Self::DpValue;
 
-            let mut child_result: Option<V> = None;
+    /// 親ノードのDP値と、その子ノードのDP値をマージ（統合）します。
+    ///
+    /// この操作は、親ノードが持つすべての子ノードに対して順番に適用され、
+    /// 最終的な親ノードのDP値が決定されます。
+    ///
+    /// # 引数
+    /// * `parent_dp_value` - 親ノードの現在のDP値。
+    /// * `child_dp_value` - マージ対象の子ノードのDP値。
+    /// * `parent_id` - 親ノードの内部ID。
+    /// * `child_id` - 子ノードの内部ID。
+    /// * `edge_weight` - 親子間のエッジの重み (`EW`) への参照。
+    /// * `graph` - グラフ全体への参照。
+    ///
+    /// # 戻り値
+    /// マージ後の親ノードの新しいDP値。
+    fn merge(
+        &self,
+        parent_dp_value: Self::DpValue,
+        child_dp_value: Self::DpValue,
+        edge_weight: Option<&EW>,
+    ) -> Self::DpValue;
+}
 
-            for &(child, edge_weight) in &graph.adj[node] {
-                if Some(child) != parent && !visited[child] {
-                    let child_dp = dfs_dp(
-                        graph,
-                        child,
-                        Some(node),
-                        edge_weight.as_ref(),
-                        visited,
-                        merge,
-                        add_node,
-                    );
-                    child_result = Some(match child_result {
-                        Some(current) => merge(current, child_dp),
-                        None => child_dp,
-                    });
-                }
-            }
+/// 木DPソルバーの振る舞いを定義するトレイト
+pub trait Solver<I, EW, NW, P>
+where
+    I: Clone + Eq + Hash,
+    P: TreeDp<I, EW, NW>,
+{
+    /// 木DPを実行し、結果をキーと値のペアを持つHashMapとして返します。
+    fn solve(
+        &self,
+        graph: &Graph<I, EW, NW, Tree>,
+        root_key: &I,
+        problem: &P,
+    ) -> Result<HashMap<I, P::DpValue, BuildHasherDefault<FxHasher>>, String>;
+}
 
-            add_node(child_result, &graph.nodes[node], parent_edge_weight)
-        }
+/// `TreeDp` トレイトに基づいて木DPを実行するソルバー
+pub struct TreeDpSolver;
 
-        Some(dfs_dp(
-            self,
-            *start_id,
-            None,
-            None,
-            &mut visited,
-            &merge,
-            &add_node,
-        ))
+impl<I, EW, NW, P> Solver<I, EW, NW, P> for TreeDpSolver
+where
+    I: Clone + Eq + Hash,
+    P: TreeDp<I, EW, NW>,
+{
+    fn solve(
+        &self,
+        graph: &Graph<I, EW, NW, Tree>,
+        root_key: &I,
+        problem: &P,
+    ) -> Result<HashMap<I, P::DpValue, BuildHasherDefault<FxHasher>>, String> {
+        let root_id = match graph.key2id(root_key) {
+            Some(id) => id,
+            None => return Err("Root key not found in graph.".to_string()),
+        };
+
+        let mut dp_table: Vec<Option<P::DpValue>> = vec![None; graph.nodes.len()];
+        Self::dfs(root_id, usize::MAX, graph, problem, &mut dp_table);
+
+        // 結果を Vec から HashMap に変換
+        let result_map = dp_table
+            .into_iter()
+            .enumerate()
+            .filter_map(|(id, dp_value_opt)| {
+                // 計算済みのノード（Noneでない）のみを対象にする
+                dp_value_opt.map(|dp_value| {
+                    // 内部IDから元のキーを復元
+                    let key = graph.reverse_map[id].clone();
+                    (key, dp_value)
+                })
+            })
+            .collect::<HashMap<_, _, _>>();
+
+        Ok(result_map)
     }
 }
 
-pub trait TreePreorder<I, EW, NW> {
-    fn preorder<V, F>(&self, start: I, calculate: F) -> HashMap<I, V>
-    where
-        V: Clone,
-        F: Fn(&Node<NW>, Option<&EW>, Option<&V>) -> V;
-}
-
-impl<I, EW, NW> TreePreorder<I, EW, NW> for Graph<I, EW, NW, Tree>
-where
-    I: Clone + Eq + Hash,
-    EW: Copy,
-    NW: Copy,
-{
-    fn preorder<V, F>(&self, start: I, calculate: F) -> HashMap<I, V>
-    where
-        V: Clone,
-        F: Fn(&Node<NW>, Option<&EW>, Option<&V>) -> V,
+// `impl TreeDpSolver` ブロック内にヘルパー関数を移動
+impl TreeDpSolver {
+    /// DFSを用いて再帰的にDP値を計算するヘルパー関数
+    fn dfs<I, EW, NW, P>(
+        u: usize,
+        p: usize,
+        graph: &Graph<I, EW, NW, Tree>,
+        problem: &P,
+        dp_table: &mut Vec<Option<P::DpValue>>,
+    ) where
+        I: Clone + Eq + Hash,
+        P: TreeDp<I, EW, NW>,
     {
-        let mut result = HashMap::new();
-
-        if let Some(&start_id) = self.coord_map.get(&start) {
-            let n = self.nodes.len();
-            let mut visited = vec![false; n];
-
-            fn dfs_preorder<V, F, I, EW, NW>(
-                graph: &Graph<I, EW, NW, Tree>,
-                node: usize,
-                parent: Option<usize>,
-                parent_edge_weight: Option<&EW>,
-                parent_value: Option<&V>,
-                visited: &mut [bool],
-                calculate: &F,
-                result: &mut HashMap<I, V>,
-            ) where
-                V: Clone,
-                F: Fn(&Node<NW>, Option<&EW>, Option<&V>) -> V,
-                I: Clone + Eq + Hash,
-                EW: Copy,
-                NW: Copy,
-            {
-                visited[node] = true;
-
-                // Calculate value for current node using parent's result (preorder: process node before children)
-                let value = calculate(&graph.nodes[node], parent_edge_weight, parent_value);
-                result.insert(graph.reverse_map[node].clone(), value.clone());
-
-                // Recursively visit children, passing current node's value as parent_value
-                for &(child, edge_weight) in &graph.adj[node] {
-                    if Some(child) != parent && !visited[child] {
-                        dfs_preorder(
-                            graph,
-                            child,
-                            Some(node),
-                            edge_weight.as_ref(),
-                            Some(&value),
-                            visited,
-                            calculate,
-                            result,
-                        );
-                    }
-                }
+        let mut u_dp_value = problem.initial_value();
+        for (v_id, edge_weight) in &graph.adj[u] {
+            let v = *v_id;
+            if v == p {
+                continue;
             }
-
-            dfs_preorder(
-                self,
-                start_id,
-                None,
-                None,
-                None, // No parent value for root
-                &mut visited,
-                &calculate,
-                &mut result,
-            );
-        }
-
-        result
-    }
-}
-
-pub trait TreePostorder<I, EW, NW> {
-    fn postorder<V, F>(&self, start: I, calculate: F) -> HashMap<I, V>
-    where
-        V: Clone,
-        F: Fn(&Node<NW>, Option<&EW>, Vec<V>) -> V;
-}
-
-impl<I, EW, NW> TreePostorder<I, EW, NW> for Graph<I, EW, NW, Tree>
-where
-    I: Clone + Eq + Hash,
-    EW: Copy,
-    NW: Copy,
-{
-    fn postorder<V, F>(&self, start: I, calculate: F) -> HashMap<I, V>
-    where
-        V: Clone,
-        F: Fn(&Node<NW>, Option<&EW>, Vec<V>) -> V,
-    {
-        let mut result = HashMap::new();
-
-        if let Some(&start_id) = self.coord_map.get(&start) {
-            let n = self.nodes.len();
-            let mut visited = vec![false; n];
-
-            fn dfs_postorder<V, F, I, EW, NW>(
-                graph: &Graph<I, EW, NW, Tree>,
-                node: usize,
-                parent: Option<usize>,
-                parent_edge_weight: Option<&EW>,
-                visited: &mut [bool],
-                calculate: &F,
-                result: &mut HashMap<I, V>,
-            ) -> V
-            where
-                V: Clone,
-                F: Fn(&Node<NW>, Option<&EW>, Vec<V>) -> V,
-                I: Clone + Eq + Hash,
-                EW: Copy,
-                NW: Copy,
-            {
-                visited[node] = true;
-
-                // First visit all children and collect their results (postorder: process children before current node)
-                let mut child_results = Vec::new();
-                for &(child, edge_weight) in &graph.adj[node] {
-                    if Some(child) != parent && !visited[child] {
-                        let child_value = dfs_postorder(
-                            graph,
-                            child,
-                            Some(node),
-                            edge_weight.as_ref(),
-                            visited,
-                            calculate,
-                            result,
-                        );
-                        child_results.push(child_value);
-                    }
-                }
-
-                // Then calculate value for current node using child results
-                let value = calculate(&graph.nodes[node], parent_edge_weight, child_results);
-                result.insert(graph.reverse_map[node].clone(), value.clone());
-                value
+            if dp_table[v].is_none() {
+                Self::dfs(v, u, graph, problem, dp_table);
             }
-
-            dfs_postorder(
-                self,
-                start_id,
-                None,
-                None,
-                &mut visited,
-                &calculate,
-                &mut result,
-            );
+            let v_dp_value = dp_table[v].as_ref().unwrap().clone();
+            u_dp_value = problem.merge(u_dp_value, v_dp_value, edge_weight.as_ref());
         }
-
-        result
+        dp_table[u] = Some(u_dp_value);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::Tree;
     use super::*;
 
-    #[test]
-    fn test_preorder_simple_tree() {
-        // Create a simple tree:
-        //     1
-        //    / \
-        //   2   3
-        //  /
-        // 4
-        let mut graph = Graph::<usize, usize, usize, Tree>::new();
+    // (SubtreeSizeProblem の実装は変更なし)
+    struct SubtreeSizeProblem;
+    impl<I, EW, NW> TreeDp<I, EW, NW> for SubtreeSizeProblem
+    where
+        I: Clone + Eq + Hash,
+    {
+        type DpValue = usize;
 
-        graph.add_edge(1, 2, Some(10));
-        graph.add_edge(1, 3, Some(20));
-        graph.add_edge(2, 4, Some(30));
+        fn initial_value(&self) -> Self::DpValue {
+            1
+        }
 
-        graph.add_weight_to_node(1, 100);
-        graph.add_weight_to_node(2, 200);
-        graph.add_weight_to_node(3, 300);
-        graph.add_weight_to_node(4, 400);
-
-        // Calculate values based on node weight + edge weight + parent value
-        let calculate =
-            |node: &Node<usize>, edge_weight: Option<&usize>, parent_value: Option<&usize>| {
-                let node_weight = node.weight.unwrap_or(0);
-                let edge_weight = edge_weight.unwrap_or(&0);
-                let parent_contribution = parent_value.unwrap_or(&0);
-                node_weight + edge_weight + parent_contribution
-            };
-
-        let result = graph.preorder(1, calculate);
-
-        // Expected values (preorder with parent value accumulation):
-        // Node 1: 100 + 0 + 0 = 100 (root, no parent)
-        // Node 2: 200 + 10 + 100 = 310 (includes parent 1's value)
-        // Node 3: 300 + 20 + 100 = 420 (includes parent 1's value)
-        // Node 4: 400 + 30 + 310 = 740 (includes parent 2's value)
-
-        assert_eq!(result.get(&1), Some(&100));
-        assert_eq!(result.get(&2), Some(&310));
-        assert_eq!(result.get(&3), Some(&420));
-        assert_eq!(result.get(&4), Some(&740));
-        assert_eq!(result.len(), 4);
+        fn merge(
+            &self,
+            parent_dp_value: Self::DpValue,
+            child_dp_value: Self::DpValue,
+            _edge_weight: Option<&EW>,
+        ) -> Self::DpValue {
+            parent_dp_value + child_dp_value
+        }
     }
 
     #[test]
-    fn test_preorder_linear_tree() {
-        // Create a linear tree: 1 -> 2 -> 3
-        let mut graph = Graph::<usize, usize, (), Tree>::new();
+    fn test_subtree_size() {
+        // 1. グラフのセットアップ (変更なし)
+        let mut graph = Graph::<&str, (), (), Tree>::new();
+        graph.add_edge("0", "1", None);
+        graph.add_edge("0", "2", None);
+        graph.add_edge("2", "3", None);
+        graph.add_edge("2", "4", None);
+        graph.add_edge("1", "0", None);
+        graph.add_edge("2", "0", None);
+        graph.add_edge("3", "2", None);
+        graph.add_edge("4", "2", None);
 
-        graph.add_edge(1, 2, Some(5));
-        graph.add_edge(2, 3, Some(7));
+        // 2. ソルバーと問題定義のインスタンスを作成
+        let solver = TreeDpSolver;
+        let problem = SubtreeSizeProblem;
 
-        // Calculate depth (distance from root) using parent depth + 1
-        let calculate =
-            |_node: &Node<()>, _edge_weight: Option<&usize>, parent_value: Option<&usize>| {
-                parent_value.unwrap_or(&0) + 1 // Parent depth + 1
-            };
+        // 3. トレイト経由でソルバーを実行
+        let dp_values = solver.solve(&graph, &"0", &problem).unwrap();
 
-        let result = graph.preorder(1, calculate);
-
-        // Expected values (depth from root):
-        // Node 1: 0 + 1 = 1 (root depth)
-        // Node 2: 1 + 1 = 2 (parent depth 1 + 1)
-        // Node 3: 2 + 1 = 3 (parent depth 2 + 1)
-
-        assert_eq!(*result.get(&1).unwrap(), 1);
-        assert_eq!(*result.get(&2).unwrap(), 2);
-        assert_eq!(*result.get(&3).unwrap(), 3);
-        assert_eq!(result.len(), 3);
-    }
-
-    #[test]
-    fn test_preorder_single_node() {
-        let mut graph = Graph::<usize, (), usize, Tree>::new();
-        graph.add_weight_to_node(1, 42);
-
-        let calculate =
-            |node: &Node<usize>, _edge_weight: Option<&()>, _parent_value: Option<&usize>| {
-                node.weight.unwrap_or(0) * 2
-            };
-
-        let result = graph.preorder(1, calculate);
-
-        assert_eq!(result.get(&1), Some(&84));
-        assert_eq!(result.len(), 1);
-    }
-
-    #[test]
-    fn test_preorder_nonexistent_start() {
-        let mut graph = Graph::<usize, (), usize, Tree>::new();
-        graph.add_weight_to_node(1, 42);
-
-        let calculate =
-            |node: &Node<usize>, _edge_weight: Option<&()>, _parent_value: Option<&usize>| {
-                node.weight.unwrap_or(0)
-            };
-
-        // Try to start from a node that doesn't exist
-        let result = graph.preorder(999, calculate);
-
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_postorder_simple_tree() {
-        // Create a simple tree:
-        //     1
-        //    / \
-        //   2   3
-        //  /
-        // 4
-        let mut graph = Graph::<usize, usize, usize, Tree>::new();
-
-        graph.add_edge(1, 2, Some(10));
-        graph.add_edge(1, 3, Some(20));
-        graph.add_edge(2, 4, Some(30));
-
-        graph.add_weight_to_node(1, 100);
-        graph.add_weight_to_node(2, 200);
-        graph.add_weight_to_node(3, 300);
-        graph.add_weight_to_node(4, 400);
-
-        // Calculate values based on node weight + edge weight + sum of child values
-        let calculate =
-            |node: &Node<usize>, edge_weight: Option<&usize>, child_results: Vec<usize>| {
-                let node_weight = node.weight.unwrap_or(0);
-                let edge_weight = edge_weight.unwrap_or(&0);
-                let child_sum: usize = child_results.iter().sum();
-                node_weight + edge_weight + child_sum
-            };
-
-        let result = graph.postorder(1, calculate);
-
-        // Expected values (postorder with child sum):
-        // Node 4: 400 + 30 + 0 = 430 (leaf node, no children)
-        // Node 2: 200 + 10 + 430 = 640 (includes child 4's result)
-        // Node 3: 300 + 20 + 0 = 320 (leaf node, no children)
-        // Node 1: 100 + 0 + (640 + 320) = 1060 (includes both children's results)
-
-        assert_eq!(result.get(&4), Some(&430));
-        assert_eq!(result.get(&2), Some(&640));
-        assert_eq!(result.get(&3), Some(&320));
-        assert_eq!(result.get(&1), Some(&1060));
-        assert_eq!(result.len(), 4);
-    }
-
-    #[test]
-    fn test_postorder_subtree_size() {
-        // Create a tree and calculate subtree sizes:
-        //     1
-        //    / \
-        //   2   3
-        //  / \   \
-        // 4   5   6
-        let mut graph = Graph::<usize, (), (), Tree>::new();
-
-        graph.add_edge(1, 2, None);
-        graph.add_edge(1, 3, None);
-        graph.add_edge(2, 4, None);
-        graph.add_edge(2, 5, None);
-        graph.add_edge(3, 6, None);
-
-        // Calculate subtree size (including current node)
-        // This is a perfect use case for postorder traversal
-        let calculate = |_node: &Node<()>, _edge_weight: Option<&()>, child_results: Vec<usize>| {
-            1 + child_results.iter().sum::<usize>() // Current node + sum of child subtree sizes
-        };
-
-        let result = graph.postorder(1, calculate);
-
-        // Expected subtree sizes:
-        // Node 4: 1 (leaf)
-        // Node 5: 1 (leaf)
-        // Node 6: 1 (leaf)
-        // Node 2: 1 + 1 + 1 = 3 (self + child 4 + child 5)
-        // Node 3: 1 + 1 = 2 (self + child 6)
-        // Node 1: 1 + 3 + 2 = 6 (self + subtree 2 + subtree 3)
-
-        assert_eq!(*result.get(&4).unwrap(), 1);
-        assert_eq!(*result.get(&5).unwrap(), 1);
-        assert_eq!(*result.get(&6).unwrap(), 1);
-        assert_eq!(*result.get(&2).unwrap(), 3);
-        assert_eq!(*result.get(&3).unwrap(), 2);
-        assert_eq!(*result.get(&1).unwrap(), 6);
-        assert_eq!(result.len(), 6);
-    }
-
-    #[test]
-    fn test_postorder_depth_calculation() {
-        // Create a linear tree: 1 -> 2 -> 3 -> 4
-        let mut graph = Graph::<usize, usize, (), Tree>::new();
-
-        graph.add_edge(1, 2, Some(1));
-        graph.add_edge(2, 3, Some(1));
-        graph.add_edge(3, 4, Some(1));
-
-        // Calculate depth from root (0-indexed)
-        let calculate =
-            |_node: &Node<()>, edge_weight: Option<&usize>, _child_results: Vec<usize>| {
-                *edge_weight.unwrap_or(&0)
-            };
-
-        let result = graph.postorder(1, calculate);
-
-        // Expected values (edge weights represent depth increment):
-        // Node 1: 0 (root)
-        // Node 2: 1 (depth 1)
-        // Node 3: 1 (edge weight 2->3)
-        // Node 4: 1 (edge weight 3->4)
-
-        assert_eq!(*result.get(&1).unwrap(), 0);
-        assert_eq!(*result.get(&2).unwrap(), 1);
-        assert_eq!(*result.get(&3).unwrap(), 1);
-        assert_eq!(*result.get(&4).unwrap(), 1);
-        assert_eq!(result.len(), 4);
-    }
-
-    #[test]
-    fn test_postorder_single_node() {
-        let mut graph = Graph::<usize, (), usize, Tree>::new();
-        graph.add_weight_to_node(1, 42);
-
-        let calculate =
-            |node: &Node<usize>, _edge_weight: Option<&()>, _child_results: Vec<usize>| {
-                node.weight.unwrap_or(0) * 3
-            };
-
-        let result = graph.postorder(1, calculate);
-
-        assert_eq!(result.get(&1), Some(&126)); // 42 * 3
-        assert_eq!(result.len(), 1);
-    }
-
-    // #[test]
-    // fn test_postorder_vs_preorder_difference() {
-    //     // Create a tree where order matters:
-    //     //     1
-    //     //    / \
-    //     //   2   3
-    //     //  /
-    //     // 4
-    //     let mut graph = Graph::<usize, usize, (), Tree>::new();
-
-    //     graph.add_edge(1, 2, Some(1));
-    //     graph.add_edge(1, 3, Some(1));
-    //     graph.add_edge(2, 4, Some(1));
-
-    //     // Simple calculation that just uses edge weight (for preorder)
-    //     let preorder_calculate = |_node: &Node<()>, edge_weight: Option<&usize>| {
-    //         *edge_weight.unwrap_or(&0)
-    //     };
-
-    //     // Simple calculation that just uses edge weight (for postorder)
-    //     let postorder_calculate = |_node: &Node<()>, edge_weight: Option<&usize>, _child_results: Vec<usize>| {
-    //         *edge_weight.unwrap_or(&0)
-    //     };
-
-    //     // let preorder_result = graph.preorder(1, preorder_calculate);
-    //     let postorder_result = graph.postorder(1, postorder_calculate);
-
-    //     // The values should be the same for this simple calculation
-    //     // since we're only using edge weights, not child results
-    //     assert_eq!(preorder_result, postorder_result);
-
-    //     // But the processing order is different internally
-    //     assert_eq!(preorder_result.len(), 4);
-    //     assert_eq!(postorder_result.len(), 4);
-    // }
-
-    #[test]
-    fn test_postorder_nonexistent_start() {
-        let mut graph = Graph::<usize, (), usize, Tree>::new();
-        graph.add_weight_to_node(1, 42);
-
-        let calculate =
-            |node: &Node<usize>, _edge_weight: Option<&()>, _child_results: Vec<usize>| {
-                node.weight.unwrap_or(0)
-            };
-
-        // Try to start from a node that doesn't exist
-        let result = graph.postorder(999, calculate);
-
-        assert!(result.is_empty());
+        // 4. HashMapとして得られた結果を検証
+        assert_eq!(dp_values.len(), 5); // 全ノードの結果が含まれているか
+        assert_eq!(dp_values[&"0"], 5); // 根"0"の結果
+        assert_eq!(dp_values[&"1"], 1); // 葉"1"の結果
+        assert_eq!(dp_values[&"2"], 3); // 中間ノード"2"の結果
+        assert_eq!(dp_values[&"3"], 1); // 葉"3"の結果
+        assert_eq!(dp_values[&"4"], 1); // 葉"4"の結果
     }
 }
