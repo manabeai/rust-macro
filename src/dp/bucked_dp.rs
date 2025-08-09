@@ -1,7 +1,7 @@
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::sync::Arc;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 // ===== 不変のエンジン（以前のまま） =====
 pub trait DPBucketed {
@@ -59,7 +59,10 @@ impl Engine {
 
 // ===== ここから所有Ctx版 =====
 #[derive(Clone, Eq, PartialEq, Hash)]
-struct S { i: usize, sick: bool }
+struct S {
+    i: usize,
+    sick: bool,
+}
 
 struct PoisonCtx {
     xs: Arc<[i32]>,
@@ -78,29 +81,42 @@ impl DPBucketed for Poison {
     }
 
     fn neighbors(ctx: &Self::Ctx, s: &Self::State) -> Vec<Self::State> {
-        if s.i == ctx.xs.len() { return vec![]; }
+        if s.i == ctx.xs.len() {
+            return vec![];
+        }
         let x = ctx.xs[s.i];
         let mut res = Vec::with_capacity(2);
         // スキップ
-        res.push(S { i: s.i + 1, sick: s.sick });
+        res.push(S {
+            i: s.i + 1,
+            sick: s.sick,
+        });
         // 食べる（死亡手は生成しない）
         match (s.sick, x) {
-            (false, 0) | (true, 0) => res.push(S { i: s.i + 1, sick: false }),
-            (false, 1)            => res.push(S { i: s.i + 1, sick: true  }),
-            (true,  1)            => {}
+            (false, 0) | (true, 0) => res.push(S {
+                i: s.i + 1,
+                sick: false,
+            }),
+            (false, 1) => res.push(S {
+                i: s.i + 1,
+                sick: true,
+            }),
+            (true, 1) => {}
             _ => unreachable!(),
         }
         res
     }
 
     fn combine(ctx: &Self::Ctx, s: &Self::State, child_vals: &[Self::Value]) -> Self::Value {
-        if s.i == ctx.xs.len() { return 0; }
+        if s.i == ctx.xs.len() {
+            return 0;
+        }
         let x = ctx.xs[s.i];
         let y = ctx.ys[s.i];
 
         // neighbors の順： [Skip, (Eatがあれば)Eat]
         let mut best = child_vals[0]; // Skip
-        let eat_ok = matches!((s.sick, x), (false,0)|(true,0)|(false,1));
+        let eat_ok = matches!((s.sick, x), (false, 0) | (true, 0) | (false, 1));
         if eat_ok {
             best = best.max(child_vals[1] + y);
         }
@@ -113,10 +129,10 @@ mod tests {
     use super::*;
 
     struct SimpleDP;
-    
+
     #[derive(Clone, Eq, PartialEq, Hash, Debug)]
     struct SimpleState(usize);
-    
+
     impl DPBucketed for SimpleDP {
         type State = SimpleState;
         type Value = i32;
@@ -148,7 +164,7 @@ mod tests {
         let ctx = ();
         let roots = vec![SimpleState(3)];
         let result = Engine::solve::<SimpleDP>(&ctx, roots);
-        
+
         assert_eq!(result.get(&SimpleState(0)), Some(&1));
         assert_eq!(result.get(&SimpleState(1)), Some(&2));
         assert_eq!(result.get(&SimpleState(2)), Some(&4));
@@ -160,10 +176,10 @@ mod tests {
         let xs = Arc::new([0, 1, 0]);
         let ys = Arc::new([10, 20, 30]);
         let ctx = PoisonCtx { xs, ys };
-        
+
         let roots = vec![S { i: 0, sick: false }];
         let result = Engine::solve::<Poison>(&ctx, roots);
-        
+
         let start_state = S { i: 0, sick: false };
         assert!(result.contains_key(&start_state));
         assert!(result.get(&start_state).unwrap() >= &40);
@@ -174,10 +190,10 @@ mod tests {
         let xs = Arc::new([]);
         let ys = Arc::new([]);
         let ctx = PoisonCtx { xs, ys };
-        
+
         let roots = vec![S { i: 0, sick: false }];
         let result = Engine::solve::<Poison>(&ctx, roots);
-        
+
         let start_state = S { i: 0, sick: false };
         assert_eq!(result.get(&start_state), Some(&0));
     }
@@ -187,10 +203,10 @@ mod tests {
         let xs = Arc::new([0]);
         let ys = Arc::new([100]);
         let ctx = PoisonCtx { xs, ys };
-        
+
         let roots = vec![S { i: 0, sick: false }];
         let result = Engine::solve::<Poison>(&ctx, roots);
-        
+
         let start_state = S { i: 0, sick: false };
         assert_eq!(result.get(&start_state), Some(&100));
     }
@@ -200,26 +216,26 @@ mod tests {
         let xs = Arc::new([1, 1, 1]);
         let ys = Arc::new([10, 20, 30]);
         let ctx = PoisonCtx { xs, ys };
-        
+
         let roots = vec![S { i: 0, sick: false }];
         let result = Engine::solve::<Poison>(&ctx, roots);
-        
+
         let start_state = S { i: 0, sick: false };
         assert_eq!(result.get(&start_state), Some(&30));
     }
 
     struct TreeDP;
-    
+
     #[derive(Clone, Eq, PartialEq, Hash, Debug)]
     struct TreeState {
         node: usize,
         depth: usize,
     }
-    
+
     struct TreeCtx {
         children: Vec<Vec<usize>>,
     }
-    
+
     impl DPBucketed for TreeDP {
         type State = TreeState;
         type Value = usize;
@@ -230,10 +246,13 @@ mod tests {
         }
 
         fn neighbors(ctx: &Self::Ctx, s: &Self::State) -> Vec<Self::State> {
-            ctx.children[s.node].iter().map(|&child| TreeState {
-                node: child,
-                depth: s.depth + 1,
-            }).collect()
+            ctx.children[s.node]
+                .iter()
+                .map(|&child| TreeState {
+                    node: child,
+                    depth: s.depth + 1,
+                })
+                .collect()
         }
 
         fn combine(_ctx: &Self::Ctx, _s: &Self::State, child_vals: &[Self::Value]) -> Self::Value {
@@ -243,18 +262,12 @@ mod tests {
 
     #[test]
     fn test_tree_dp() {
-        let children = vec![
-            vec![1, 2],
-            vec![3, 4],
-            vec![],
-            vec![],
-            vec![],
-        ];
+        let children = vec![vec![1, 2], vec![3, 4], vec![], vec![], vec![]];
         let ctx = TreeCtx { children };
-        
+
         let roots = vec![TreeState { node: 0, depth: 0 }];
         let result = Engine::solve::<TreeDP>(&ctx, roots);
-        
+
         assert_eq!(result.get(&TreeState { node: 0, depth: 0 }), Some(&5));
         assert_eq!(result.get(&TreeState { node: 1, depth: 1 }), Some(&3));
         assert_eq!(result.get(&TreeState { node: 2, depth: 1 }), Some(&1));
@@ -267,7 +280,7 @@ mod tests {
         let ctx = ();
         let roots = vec![SimpleState(2), SimpleState(1)];
         let result = Engine::solve::<SimpleDP>(&ctx, roots);
-        
+
         assert_eq!(result.len(), 3);
         assert!(result.contains_key(&SimpleState(0)));
         assert!(result.contains_key(&SimpleState(1)));
@@ -279,7 +292,7 @@ mod tests {
         let ctx = ();
         let roots: Vec<SimpleState> = vec![];
         let result = Engine::solve::<SimpleDP>(&ctx, roots);
-        
+
         assert!(result.is_empty());
     }
 }

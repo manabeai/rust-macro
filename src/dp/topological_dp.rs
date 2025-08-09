@@ -1,5 +1,5 @@
-use std::hash::Hash;
 use rustc_hash::FxHashMap;
+use std::hash::Hash;
 
 /// トポロジカル順序で計算可能なDPの問題定義を表すトレイト
 ///
@@ -114,10 +114,10 @@ mod tests {
             // 収支 B_ij = A_ij - P_{i+j}
             // (A, Pは0-indexedなので添字を合わせる)
             let b_ij = self.a[i][j] - self.p[i + j];
-            
+
             // 次のマスで要求される金額の最小値
             let min_next_required = min(next_values[0], next_values[1]);
-            
+
             // 遷移式: dp[i][j] = max(0, min(dp[i+1][j], dp[i][j+1]) - B_ij)
             max(0, min_next_required - b_ij)
         }
@@ -143,7 +143,7 @@ mod tests {
         // (1,1)からスタートするために最初に必要な金額は2
         assert_eq!(*result, 2);
     }
-    
+
     // --- Test Case 2: Simple Path Counting ---
     struct PathCounter {
         h: usize,
@@ -155,7 +155,7 @@ mod tests {
         type Value = usize; // 経路数
 
         fn nodes_in_order(&self) -> Vec<Self::Node> {
-             let mut nodes = Vec::with_capacity(self.h * self.w);
+            let mut nodes = Vec::with_capacity(self.h * self.w);
             for i in (0..self.h).rev() {
                 for j in (0..self.w).rev() {
                     nodes.push((i, j));
@@ -177,7 +177,7 @@ mod tests {
                 next_values[0] + next_values[1]
             }
         }
-        
+
         fn boundary_value(&self) -> Self::Value {
             // 加算なので、境界外は0
             0
@@ -189,11 +189,11 @@ mod tests {
         // 2x2グリッドの左上から右下への経路は2通り
         let problem_2x2 = PathCounter { h: 2, w: 2 };
         let dp_2x2 = TopologicalDPSolver::solve(&problem_2x2);
-        assert_eq!(*dp_2x2.get(&(0,0)).unwrap(), 2);
+        assert_eq!(*dp_2x2.get(&(0, 0)).unwrap(), 2);
 
         // 3x3グリッドでは6通り
         let problem_3x3 = PathCounter { h: 3, w: 3 };
         let dp_3x3 = TopologicalDPSolver::solve(&problem_3x3);
-        assert_eq!(*dp_3x3.get(&(0,0)).unwrap(), 6);
+        assert_eq!(*dp_3x3.get(&(0, 0)).unwrap(), 6);
     }
 }
