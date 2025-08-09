@@ -11,7 +11,7 @@ pub mod utils;
 
 pub use bit_vec::{BitVec, BitVecAll, BitVecIter, BitVecRange};
 pub use cumulative_sum::{CumulativeSum, CumulativeSum2D};
-pub use dp::{DigitDP, MemoizedDFS};
+pub use dp::{DigitDP, DpValue, MemoizedDFS};
 pub use graph::{Directed, Graph, Node, Tree, Undirected};
 pub use imos::{Imos1D, Imos2D};
 pub use union_find::{PersistentUnionFind, UnionFind};
