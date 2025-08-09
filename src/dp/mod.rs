@@ -1,7 +1,6 @@
 pub mod bucked_dp;
 pub mod digit_dp;
 pub mod memorized_dfs;
-pub mod topological_dp;
 
 pub use bucked_dp::{DPBucketed, Engine};
 pub use digit_dp::DigitDP;

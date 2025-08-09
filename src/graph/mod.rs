@@ -198,7 +198,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
 
     use super::*;
 
@@ -282,7 +281,6 @@ mod tests {
     //     // Should create nodes for positions: (0,0), (1,0), (1,1), (2,1), (2,2) = 5 nodes
     //     assert_eq!(graph.nodes.len(), 5);
     // }
-    #[test]
     fn test_directed_to_dsu_simple_cycle() {
         let mut graph = Graph::<usize, (), (), Directed>::new();
         // Create cycle: 1 -> 2 -> 3 -> 1
