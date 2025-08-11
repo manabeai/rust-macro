@@ -188,4 +188,78 @@ mod tests {
         assert_eq!(result.get(&2), Some(&30));
         assert_eq!(result.get(&3), Some(&30));
     }
+
+    #[test]
+    fn test_enhanced_push_dp() {
+        let ctx = Ctx {
+            h: vec![10, 30, 40, 20],
+        };
+        let sources = vec![0];
+        let result = PushDpEngineEnhanced::propagate::<FrogPush>(&ctx, sources);
+        assert_eq!(result.len(), 4);
+        assert_eq!(result.get(&0), Some(&0));
+        assert_eq!(result.get(&1), Some(&20));
+        assert_eq!(result.get(&2), Some(&30));
+        assert_eq!(result.get(&3), Some(&30));
+    }
+}
+
+// 高速化したエンジン。　若干可読性が悪いので前のバージョンも残す
+pub struct PushDpEngineEnhanced;
+impl PushDpEngineEnhanced {
+    pub fn propagate<D: PushDPRules>(
+        ctx: &D::Ctx,
+        sources: impl IntoIterator<Item = D::State>,
+    ) -> FxHashMap<D::State, D::Value> {
+        use rustc_hash::{FxHashMap, FxHashSet};
+        use std::collections::BTreeMap;
+
+        let mut seen = FxHashSet::<D::State>::default();
+        let mut buckets = BTreeMap::<usize, Vec<D::State>>::new();
+        let mut adj = FxHashMap::<D::State, Vec<D::State>>::default();
+
+        let mut stack: Vec<D::State> = sources.into_iter().collect();
+        for s in &stack {
+            if seen.insert(s.clone()) {
+                buckets.entry(D::rank(ctx, s)).or_default().push(s.clone());
+            }
+        }
+        while let Some(s) = stack.pop() {
+            let rs = D::rank(ctx, &s);
+            let ns = D::succs(ctx, &s);
+            debug_assert!(ns.iter().all(|t| D::rank(ctx, t) > rs));
+            adj.insert(s.clone(), ns.clone());
+            for t in ns {
+                if seen.insert(t.clone()) {
+                    buckets.entry(D::rank(ctx, &t)).or_default().push(t.clone());
+                    stack.push(t);
+                }
+            }
+        }
+
+        let mut val = FxHashMap::<D::State, D::Value>::default();
+        // ソースの初期化
+        for (_r, states) in buckets.iter() {
+            for s in states {
+                if let Some(v0) = D::init(ctx, s) {
+                    val.insert(s.clone(), v0);
+                }
+            }
+        }
+
+        // rank 昇順で配る
+        for (_r, states) in buckets.iter() {
+            for s in states {
+                let vs = val.get(s).cloned().unwrap_or_else(|| D::identity(ctx));
+                if let Some(succs) = adj.get(s) {
+                    for t in succs {
+                        let inc = D::trans(ctx, s, t, &vs);
+                        let entry = val.entry(t.clone()).or_insert_with(|| D::identity(ctx));
+                        *entry = D::op(ctx, entry, &inc);
+                    }
+                }
+            }
+        }
+        val
+    }
 }
