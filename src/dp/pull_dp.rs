@@ -38,7 +38,6 @@ pub struct Plan<S: Eq + Hash + Clone> {
 pub struct PullDpEngine;
 
 impl PullDpEngine {
-    /// 探索のみ行い、rank バケツと隣接行列を構築
     pub fn prepare<D: PullDPRules>(
         ctx: &D::Ctx,
         roots: impl IntoIterator<Item = D::State>,
@@ -46,7 +45,6 @@ impl PullDpEngine {
         let mut seen = FxHashSet::<D::State>::default();
         let mut adj = FxHashMap::<D::State, Vec<D::State>>::default();
 
-        // Vec<Vec> のバケツ（log を消す）
         let mut buckets: Vec<Vec<D::State>> = Vec::new();
         let push_bucket = |r: usize, s: D::State, b: &mut Vec<Vec<D::State>>| {
             if r >= b.len() {
@@ -124,15 +122,15 @@ impl PullDpEngine {
 //     type Value = Dummy;
 //     type Ctx = Dummy;
 
-//     fn rank(_ctx: &Self::Ctx, s: &Self::State) -> usize {
+//     fn rank(ctx: &Self::Ctx, s: &Self::State) -> usize {
 //         todo!();
 //     }
 
-//     fn neighbors(_ctx: &Self::Ctx, s: &Self::State) -> Vec<Self::State> {
+//     fn neighbors(ctx: &Self::Ctx, s: &Self::State) -> Vec<Self::State> {
 //         todo!();
 //     }
 
-//     fn base(_ctx: &Self::Ctx, s: &Self::State) -> Option<Self::Value> {
+//     fn base(ctx: &Self::Ctx, s: &Self::State) -> Option<Self::Value> {
 //         todo!();
 //     }
 

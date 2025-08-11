@@ -95,7 +95,7 @@ impl PushDpEngine {
 //     type Value = Dummy;
 //     type Ctx = Dummy;
 
-//     fn rank(_ctx: &Self::Ctx, s: &Self::State) -> usize {
+//     fn rank(ctx: &Self::Ctx, s: &Self::State) -> usize {
 //         todo!()
 //     }
 
@@ -103,7 +103,7 @@ impl PushDpEngine {
 //         todo!()
 //     }
 
-//     fn identity(_ctx: &Self::Ctx) -> Self::Value {
+//     fn identity(ctx: &Self::Ctx) -> Self::Value {
 //         todo!()
 //     }
 
