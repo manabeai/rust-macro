@@ -89,8 +89,8 @@ impl PushDpEngine {
 // 実装用のトレイト実装の雛形。
 // #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 // struct Dummy;
-// struct FrogPush;
-// impl PushDPRules for FrogPush {
+// struct Problem;
+// impl PushDPRules for Problem {
 //     type State = Dummy;
 //     type Value = Dummy;
 //     type Ctx = Dummy;
@@ -107,11 +107,11 @@ impl PushDpEngine {
 //         todo!()
 //     }
 
-//     fn op(_ctx: &Self::Ctx, a: &Self::Value, b: &Self::Value) -> Self::Value {
+//     fn op(ctx: &Self::Ctx, a: &Self::Value, b: &Self::Value) -> Self::Value {
 //         todo!()
 //     }
 
-//     fn init(_ctx: &Self::Ctx, s: &Self::State) -> Option<Self::Value> {
+//     fn init(ctx: &Self::Ctx, s: &Self::State) -> Option<Self::Value> {
 //         todo!()
 //     }
 
