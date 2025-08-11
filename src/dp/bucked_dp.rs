@@ -3,8 +3,7 @@ use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::sync::Arc;
 
-// ===== 不変のエンジン（以前のまま） =====
-pub trait DPBucketed {
+pub trait DagDPRules {
     type State: Clone + Eq + Hash;
     type Value: Clone;
     type Ctx;
@@ -16,7 +15,7 @@ pub trait DPBucketed {
 
 pub struct Engine;
 impl Engine {
-    pub fn solve<D: DPBucketed>(
+    pub fn solve<D: DagDPRules>(
         ctx: &D::Ctx,
         roots: impl IntoIterator<Item = D::State>,
     ) -> FxHashMap<D::State, D::Value> {
@@ -71,7 +70,7 @@ struct PoisonCtx {
 
 struct Poison;
 
-impl DPBucketed for Poison {
+impl DagDPRules for Poison {
     type State = S;
     type Value = i64;
     type Ctx = PoisonCtx;
@@ -133,7 +132,7 @@ mod tests {
     #[derive(Clone, Eq, PartialEq, Hash, Debug)]
     struct SimpleState(usize);
 
-    impl DPBucketed for SimpleDP {
+    impl DagDPRules for SimpleDP {
         type State = SimpleState;
         type Value = i32;
         type Ctx = ();
@@ -236,7 +235,7 @@ mod tests {
         children: Vec<Vec<usize>>,
     }
 
-    impl DPBucketed for TreeDP {
+    impl DagDPRules for TreeDP {
         type State = TreeState;
         type Value = usize;
         type Ctx = TreeCtx;
