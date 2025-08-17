@@ -94,29 +94,24 @@ impl PushDpEngine {
 // 実装用のトレイト実装の雛形。
 // #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 // struct Dummy;
+
+// #[derive(Clone, Debug)]
+// pub struct Ctx {
+//     todo: Dummy,
+// }
 // struct Problem;
 // impl PushDPRules for Problem {
 //     type State = Dummy;
 //     type Value = Dummy;
-//     type Ctx = Dummy;
+//     type Ctx = Ctx;
 
 //     fn rank(ctx: &Self::Ctx, s: &Self::State) -> usize {
 //         todo!()
 //     }
-
-//     fn succs(ctx: &Self::Ctx, s: &Self::State) -> Vec<Self::State> {
-//         todo!()
-//     }
-
-//     fn identity(ctx: &Self::Ctx) -> Self::Value {
-//         todo!()
-//     }
-
-//     fn op(ctx: &Self::Ctx, a: &Self::Value, b: &Self::Value) -> Self::Value {
-//         todo!()
-//     }
-
 //     fn init(ctx: &Self::Ctx, s: &Self::State) -> Option<Self::Value> {
+//         todo!()
+//     }
+//     fn succs(ctx: &Self::Ctx, s: &Self::State) -> Vec<Self::State> {
 //         todo!()
 //     }
 
@@ -126,6 +121,14 @@ impl PushDpEngine {
 //         to: &Self::State,
 //         v_from: &Self::Value,
 //     ) -> Self::Value {
+//         todo!()
+//     }
+
+//     fn identity(ctx: &Self::Ctx) -> Self::Value {
+//         todo!()
+//     }
+
+//     fn op(ctx: &Self::Ctx, a: &Self::Value, b: &Self::Value) -> Self::Value {
 //         todo!()
 //     }
 // }
