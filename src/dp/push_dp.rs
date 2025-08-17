@@ -1,9 +1,10 @@
 use rustc_hash::FxHashMap;
 use std::cmp::min;
+use std::fmt::Debug;
 use std::hash::Hash;
 pub trait PushDPRules {
-    type State: Clone + Eq + Hash;
-    type Value: Clone;
+    type State: Clone + Eq + Hash + Debug;
+    type Value: Clone + Debug;
     type Ctx;
 
     // rank: 低→高のトポ順で処理（push なので succ は rank が上がる想定）
@@ -49,6 +50,7 @@ impl PushDpEngine {
         while let Some(s) = stack.pop() {
             let rs = D::rank(ctx, &s);
             let ns = D::succs(ctx, &s);
+            // eprintln!("succs: state={:?}, nexts={:?}, rank_next={:?}", s, ns, rs);
             debug_assert!(ns.iter().all(|t| D::rank(ctx, t) > rs));
             adj.insert(s.clone(), ns.clone());
             for t in ns {
@@ -64,6 +66,7 @@ impl PushDpEngine {
         for (_r, states) in buckets.iter() {
             for s in states {
                 if let Some(v0) = D::init(ctx, s) {
+                    // eprintln!("init: state={:?}, v={:?}", s, v0);
                     val.insert(s.clone(), v0);
                 }
             }
@@ -76,8 +79,10 @@ impl PushDpEngine {
                 if let Some(succs) = adj.get(s) {
                     for t in succs {
                         let inc = D::trans(ctx, s, t, &vs);
+                        // eprintln!("trans: state={:?}, from={:?}, to={:?}, v_from={:?} => {:?}", s, s, t, &vs, inc);
                         let entry = val.entry(t.clone()).or_insert_with(|| D::identity(ctx));
                         *entry = D::op(ctx, entry, &inc);
+                        // eprintln!("op: state={:?}, a={:?}, b={:?} => {:?}", s, *entry, &inc, *entry);
                     }
                 }
             }
